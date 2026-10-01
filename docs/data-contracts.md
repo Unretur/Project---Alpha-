@@ -597,7 +597,7 @@ Only the source of the data changes.
 
 # 22. Current Status
 
-## Defined
+## Defined and Locked
 
 * NIFTY 50 underlying
 * 5-minute decision cycle
@@ -612,16 +612,41 @@ Only the source of the data changes.
 * Global data
 * Paper-trading records
 * Timestamp integrity requirements
+* GitHub repository and source-of-truth workflow
+* Upstox as the primary market-data API for V1 implementation
+
+## Implementation Started
+
+The next implementation work begins at the API layer.
+
+### Immediate API sequence
+
+```text
+Upstox authentication
+        ↓
+NIFTY instrument discovery
+        ↓
+Historical NIFTY data
+        ↓
+Futures data
+        ↓
+Options / option-chain data
+        ↓
+Global market data
+        ↓
+Live WebSocket
+        ↓
+Raw-data storage
+```
 
 ## Not Yet Finalized
 
-* Historical market-data provider
-* Historical options-data provider
-* Historical news provider
-* Macro providers
-* Global-data providers
 * Exact feature list
+* Historical news provider
+* Macro series
+* Exact global instrument list
 * Exact option-selection methodology
 * Exact signal thresholds
 * Exact risk-management rules
 * Data retention/storage implementation
+* Final prediction model architecture

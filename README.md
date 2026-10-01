@@ -372,22 +372,77 @@ The historical backtest and paper-trading system should share the same core prep
 
 ## Current Status
 
-**Phase 0 — Research Specification**
+### Repository / Engineering Status
 
-* [ ] NIFTY 50 selected as underlying
-* [ ] 5-minute prediction horizon defined
-* [ ] 15-minute prediction horizon defined
-* [ ] 30-minute prediction horizon defined
-* [ ] Near-ATM weekly NIFTY CE/PE selected as execution instrument
-* [ ] Paper trading selected as the first live validation stage
-* [ ] Final data providers selected
-* [ ] Data contracts finalized
-* [ ] Timestamp methodology finalized
-* [ ] Prediction model architecture finalized
-* [ ] Backtesting framework implemented
-* [ ] Paper-trading engine implemented
-* [ ] AWS deployment implemented
-* [ ] Live dashboard implemented
+- [x] GitHub repository connected and active
+- [x] GitHub repository: `Unretur/Project---Alpha-`
+- [x] Main branch established
+- [x] README created
+- [x] Research specification created
+- [x] Data contracts created
+- [x] Provider research completed
+- [x] Core Alpha scope locked
+- [x] Upstox selected as the primary market-data API for V1 implementation
+- [ ] Upstox developer app/authentication configured
+- [ ] First successful NIFTY API response
+- [ ] Historical market-data ingestion
+- [ ] Derivatives/options ingestion
+- [ ] Live WebSocket ingestion
+- [ ] Macro/news integrations
+- [ ] Feature pipeline
+- [ ] FinBERT inference pipeline
+- [ ] Prediction model
+- [ ] Signal engine
+- [ ] Backtesting engine
+- [ ] Paper-trading engine
+- [ ] AWS deployment
+- [ ] Live dashboard
+
+### Current Phase
+
+**Phase 1 — API Implementation**
+
+Research and repository setup are complete. The project is now moving directly into implementation.
+
+The immediate implementation sequence is:
+
+```text
+Upstox App
+    ↓
+Authentication
+    ↓
+First NIFTY API response
+    ↓
+Instrument discovery
+    ↓
+Historical market data
+    ↓
+Futures + options / option chain
+    ↓
+Global market data
+    ↓
+Live WebSocket
+    ↓
+Raw-data storage
+```
+
+After the market-data layer is working, Alpha will proceed to macro/news ingestion, FinBERT, feature engineering, model training, backtesting, paper trading, AWS deployment, and the dashboard.
+
+### Development Rule
+
+The GitHub repository is the source of truth for the project.
+
+Implementation will proceed component-by-component. Each integration should be tested before the next layer is built. Secrets must remain outside GitHub and be stored through environment variables/secrets management.
+
+### Immediate Next Step
+
+**Create/configure the Upstox developer application and complete authentication.**
+
+The first technical milestone is:
+
+> **Project Alpha successfully retrieves real NIFTY market data through Upstox from Python.**
+
+Only after this succeeds should the next API/data component be implemented.
 
 ---
 

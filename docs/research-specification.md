@@ -630,44 +630,107 @@ The exact acceptance criteria will be defined before the paper-trading period be
 
 # 21. Current Decisions
 
-| Decision                   | Status                      |
-| -------------------------- | --------------------------- |
-| Underlying                 | NIFTY 50                    |
-| Prediction horizons        | 5m / 15m / 30m              |
-| Initial decision frequency | 5 minutes                   |
-| Execution instrument       | Near-ATM weekly NIFTY CE/PE |
-| News sentiment model       | FinBERT                     |
-| Market features            | Included                    |
-| Derivatives features       | Included                    |
-| Macro features             | Included                    |
-| Global features            | Included                    |
-| Historical backtesting     | Required                    |
-| Paper trading              | Required                    |
-| Paper-trading duration     | 1–2 months                  |
-| Real-money trading         | Not part of initial project |
-| Timestamp integrity        | Mandatory                   |
-| Look-ahead prevention      | Mandatory                   |
-| Time-series validation     | Mandatory                   |
+| Decision | Status |
+| --- | --- |
+| Underlying | **Locked — NIFTY 50** |
+| Prediction horizons | **Locked — 5m / 15m / 30m** |
+| Initial decision frequency | **Locked — 5 minutes** |
+| Execution instrument | **Locked — near-ATM weekly NIFTY CE/PE for paper trading** |
+| News sentiment model | **Locked — FinBERT** |
+| Market features | Included |
+| Derivatives features | Included |
+| Macro features | Included |
+| Global features | Included |
+| Historical backtesting | Required |
+| Paper trading | Required |
+| Paper-trading duration | 1–2 months |
+| Real-money trading | Not part of initial project |
+| Timestamp integrity | Mandatory |
+| Look-ahead prevention | Mandatory |
+| Time-series validation | Mandatory |
+| Repository | **GitHub — `Unretur/Project---Alpha-`, main branch** |
+| Primary market-data API for V1 | **Upstox — implementation selected** |
+| Current development phase | **API implementation** |
 
 ---
 
-# 22. Open Research Decisions
+# 22. Implementation Status
 
-The following are intentionally not finalized yet:
+Research and specification are complete enough to begin implementation.
 
-* Exact historical market-data provider
-* Exact options-data provider
-* Exact news providers
-* Exact macro data providers
-* Exact global data providers
-* Final feature list
-* Exact prediction model architecture
-* Regression vs. classification architecture
+The project will **not return to a broad research phase** unless implementation exposes a concrete data or engineering blocker.
+
+Current sequence:
+
+```text
+1. Upstox authentication
+2. First successful NIFTY API call
+3. Instrument discovery
+4. Historical market data
+5. Futures/options/option-chain data
+6. Global market data
+7. Live WebSocket
+8. Raw-data storage and validation
+9. Macro + news ingestion
+10. FinBERT
+11. Feature engineering
+12. Training dataset
+13. Baseline models
+14. Alpha prediction model
+15. Signal engine
+16. Backtesting
+17. Paper trading
+18. AWS deployment
+19. Streamlit dashboard
+```
+
+---
+
+# 23. Immediate Implementation Gate
+
+The first gate is deliberately small:
+
+### Gate 1 — Upstox connectivity
+
+Alpha must be able to:
+
+1. authenticate with Upstox,
+2. obtain the required access token,
+3. identify the NIFTY instrument,
+4. request market data,
+5. parse the response into the Alpha data contract,
+6. pass basic data-quality checks.
+
+**Success condition:**
+
+```text
+Upstox
+  ↓
+Python
+  ↓
+NIFTY response
+  ↓
+Validated internal representation
+```
+
+No ML work begins before this data path is working.
+
+---
+
+# 24. Open Decisions
+
+The following remain implementation/research decisions rather than blockers:
+
+* Exact feature list
+* Exact news provider
+* Exact macro series
+* Exact global instrument list
+* Final prediction model architecture
+* Regression vs classification combination
 * Signal thresholds
 * Position-sizing methodology
 * Risk limits
-* Option-selection algorithm
-* Execution assumptions
+* Exact option-selection methodology
 * AWS architecture details
 
-These decisions will be made through research and experiments rather than arbitrary assumptions.
+These should be resolved when the corresponding implementation stage is reached, rather than delaying API development.

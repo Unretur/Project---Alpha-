@@ -1,0 +1,32 @@
+import requests
+
+from src.config.config import FRED_API_KEY
+
+
+BASE_URL = "https://api.stlouisfed.org/fred"
+
+
+class FREDClient:
+    def __init__(self, api_key: str):
+        self.session = requests.Session()
+        self.api_key = api_key
+
+    def get(self, endpoint: str, params: dict | None = None):
+        params = {
+            **(params or {}),
+            "api_key": self.api_key,
+            "file_type": "json",
+        }
+
+        response = self.session.get(
+            f"{BASE_URL}{endpoint}",
+            params=params,
+            timeout=30,
+        )
+
+        response.raise_for_status()
+
+        return response.json()
+
+
+client = FREDClient(FRED_API_KEY)

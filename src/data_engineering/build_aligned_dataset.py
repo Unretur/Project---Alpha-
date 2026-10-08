@@ -1,0 +1,437 @@
+from pathlib import Path
+
+import pandas as pd
+
+from src.data_engineering.normalize import (
+    normalize_datetime,
+    sort_by_datetime,
+    remove_duplicate_timestamps,
+)
+
+from src.data_engineering.time_alignment import align_asof
+
+from src.data_engineering.validation import (
+    validate_datetime_column,
+    validate_sorted,
+    validate_no_duplicates,
+    validate_no_lookahead,
+)
+
+
+# ============================================================
+# FRED SERIES
+# ============================================================
+
+FRED_SERIES = {
+    "VIXCLS": "vix",
+    "DGS10": "us10y",
+    "DFF": "fed_funds",
+    "DEXINUS": "usd_inr",
+}
+
+
+# ============================================================
+# RBI SERIES
+# ============================================================
+
+RBI_SERIES = {
+    "policy_rates_parsed.csv": {
+        "date_column": "effective_date",
+        "available_column": "policy_available_time",
+        "features": [
+            "bank_rate",
+            "repo_rate",
+            "reverse_repo_rate",
+            "sdf_rate",
+            "msf_rate",
+            "crr",
+            "slr",
+        ],
+    },
+    "exchange_rates_parsed.csv": {
+        "date_column": "date",
+        "available_column": "fx_available_time",
+        "features": [
+            "usd_inr",
+            "gbp_inr",
+            "eur_inr",
+        ],
+    },
+}
+
+
+# ============================================================
+# FRED LOADER
+# ============================================================
+
+def load_fred_series(
+    series_id: str,
+    feature_name: str,
+) -> pd.DataFrame:
+
+    path = Path(
+        f"data/raw/fred/{series_id}.csv"
+    )
+
+    df = pd.read_csv(path)
+
+    df = normalize_datetime(
+        df,
+        "date",
+    )
+
+    df = sort_by_datetime(
+        df,
+        "date",
+    )
+
+    df = remove_duplicate_timestamps(
+        df,
+        "date",
+    )
+
+    df = df.rename(
+        columns={
+            "date": f"{feature_name}_available_time",
+            "value": feature_name,
+        }
+    )
+
+    return df
+
+
+# ============================================================
+# RBI LOADER
+# ============================================================
+
+def load_rbi_file(
+    filename: str,
+    date_column: str,
+    available_column: str,
+    features: list[str],
+) -> pd.DataFrame:
+
+    path = Path(
+        f"data/raw/rbi/{filename}"
+    )
+
+    df = pd.read_csv(path)
+
+    df = normalize_datetime(
+        df,
+        date_column,
+    )
+
+    df = sort_by_datetime(
+        df,
+        date_column,
+    )
+
+    df = remove_duplicate_timestamps(
+        df,
+        date_column,
+    )
+
+    df = df[
+        [date_column] + features
+    ].copy()
+
+    df = df.rename(
+        columns={
+            date_column: available_column
+        }
+    )
+
+    return df
+
+
+# ============================================================
+# MAIN PIPELINE
+# ============================================================
+
+if __name__ == "__main__":
+
+    # --------------------------------------------------------
+    # 1. Load NIFTY
+    # --------------------------------------------------------
+
+    nifty_path = Path(
+        "data/raw/market/nifty50_5m.csv"
+    )
+
+    nifty = pd.read_csv(
+        nifty_path
+    )
+
+    nifty = normalize_datetime(
+        nifty,
+        "timestamp",
+    )
+
+    nifty = sort_by_datetime(
+        nifty,
+        "timestamp",
+    )
+
+    nifty = remove_duplicate_timestamps(
+        nifty,
+        "timestamp",
+    )
+
+    # --------------------------------------------------------
+    # Validate NIFTY
+    # --------------------------------------------------------
+
+    validate_datetime_column(
+        nifty,
+        "timestamp",
+    )
+
+    validate_sorted(
+        nifty,
+        "timestamp",
+    )
+
+    validate_no_duplicates(
+        nifty,
+        "timestamp",
+    )
+
+    # --------------------------------------------------------
+    # 2. Start aligned dataset
+    # --------------------------------------------------------
+
+    aligned = nifty.copy()
+
+    # --------------------------------------------------------
+    # 3. Align FRED
+    # --------------------------------------------------------
+
+    print()
+    print("Aligning FRED series...")
+
+    for series_id, feature_name in FRED_SERIES.items():
+
+        fred = load_fred_series(
+            series_id,
+            feature_name,
+        )
+
+        available_column = (
+            f"{feature_name}_available_time"
+        )
+
+        validate_datetime_column(
+            fred,
+            available_column,
+        )
+
+        validate_sorted(
+            fred,
+            available_column,
+        )
+
+        validate_no_duplicates(
+            fred,
+            available_column,
+        )
+
+        aligned = align_asof(
+            aligned,
+            fred,
+            left_on="timestamp",
+            right_on=available_column,
+        )
+
+        validate_no_lookahead(
+            aligned,
+            decision_column="timestamp",
+            available_column=available_column,
+        )
+
+        print(
+            f"  ✓ {series_id} → {feature_name}"
+        )
+
+    # --------------------------------------------------------
+    # 4. Align RBI
+    # --------------------------------------------------------
+
+    print()
+    print("Aligning RBI series...")
+
+    for filename, config in RBI_SERIES.items():
+
+        available_column = config[
+            "available_column"
+        ]
+
+        rbi = load_rbi_file(
+            filename=filename,
+            date_column=config["date_column"],
+            available_column=available_column,
+            features=config["features"],
+        )
+
+        validate_datetime_column(
+            rbi,
+            available_column,
+        )
+
+        validate_sorted(
+            rbi,
+            available_column,
+        )
+
+        validate_no_duplicates(
+            rbi,
+            available_column,
+        )
+
+        aligned = align_asof(
+            aligned,
+            rbi,
+            left_on="timestamp",
+            right_on=available_column,
+        )
+
+        validate_no_lookahead(
+            aligned,
+            decision_column="timestamp",
+            available_column=available_column,
+        )
+
+        print(
+            f"  ✓ {filename}"
+        )
+
+    # --------------------------------------------------------
+    # 5. Resolve duplicate USD/INR columns
+    # --------------------------------------------------------
+
+    # FRED provides usd_inr and RBI exchange rates also
+    # provides usd_inr. Pandas therefore creates _x and _y.
+    # Rename them explicitly so the final dataset is clear.
+
+    if "usd_inr_x" in aligned.columns:
+        aligned = aligned.rename(
+            columns={
+                "usd_inr_x": "usd_inr_fred"
+            }
+        )
+
+    if "usd_inr_y" in aligned.columns:
+        aligned = aligned.rename(
+            columns={
+                "usd_inr_y": "usd_inr_rbi"
+            }
+        )
+
+    # --------------------------------------------------------
+    # 6. Save unified dataset
+    # --------------------------------------------------------
+
+    output_path = Path(
+        "data/processed/nifty_macro_aligned.csv"
+    )
+
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    aligned.to_csv(
+        output_path,
+        index=False,
+    )
+
+    # --------------------------------------------------------
+    # 7. Summary
+    # --------------------------------------------------------
+
+    print()
+    print("=" * 60)
+    print("NIFTY + FRED + RBI ALIGNMENT COMPLETED")
+    print("=" * 60)
+
+    print()
+    print("NIFTY rows:", len(nifty))
+    print("Final aligned rows:", len(aligned))
+
+    # --------------------------------------------------------
+    # Final columns
+    # --------------------------------------------------------
+
+    print()
+    print("Final columns:")
+    print(
+        aligned.columns.tolist()
+    )
+
+    # --------------------------------------------------------
+    # Missing values
+    # --------------------------------------------------------
+
+    macro_columns = [
+        "vix",
+        "us10y",
+        "fed_funds",
+        "usd_inr_fred",
+        "usd_inr_rbi",
+        "bank_rate",
+        "repo_rate",
+        "reverse_repo_rate",
+        "sdf_rate",
+        "msf_rate",
+        "crr",
+        "slr",
+        "gbp_inr",
+        "eur_inr",
+    ]
+
+    print()
+    print("Missing values:")
+
+    print(
+        aligned[
+            macro_columns
+        ].isna().sum()
+    )
+
+    # --------------------------------------------------------
+    # First 5 rows
+    # --------------------------------------------------------
+
+    print()
+    print("First 5 rows:")
+
+    print(
+        aligned[
+            [
+                "timestamp",
+                "close",
+                "vix",
+                "us10y",
+                "fed_funds",
+                "usd_inr_fred",
+                "usd_inr_rbi",
+                "repo_rate",
+                "crr",
+                "gbp_inr",
+                "eur_inr",
+            ]
+        ].head()
+    )
+
+    # --------------------------------------------------------
+    # Final validation
+    # --------------------------------------------------------
+
+    print()
+    print("Look-ahead validation: PASSED")
+
+    print()
+    print(
+        "Saved:",
+        output_path,
+    )

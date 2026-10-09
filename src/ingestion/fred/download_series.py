@@ -10,6 +10,11 @@ def download_fred_series(
     output_path: Path,
 ) -> pd.DataFrame:
 
+    if not FRED_API_KEY:
+        raise ValueError(
+            "FRED_API_KEY is missing. Set it in your .env file."
+        )
+
     response = client.get(
         "/series/observations",
         params={

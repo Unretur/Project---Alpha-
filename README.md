@@ -454,6 +454,14 @@ Project Alpha is an experimental research and engineering project. Historical ba
 
 Run commands from the repository root in the same Python environment used for the project.
 
+Create the environment and install the project's runtime dependencies (PowerShell):
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
 1. Configure local credentials in `.env` (copy `.env.example` and use the variable names documented by `src/config/config.py`). Never commit `.env`.
 2. Download FRED observations:
    ```powershell

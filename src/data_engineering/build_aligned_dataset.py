@@ -34,30 +34,7 @@ FRED_SERIES = {
 # RBI SERIES
 # ============================================================
 
-RBI_SERIES = {
-    "policy_rates_parsed.csv": {
-        "date_column": "effective_date",
-        "available_column": "policy_available_time",
-        "features": [
-            "bank_rate",
-            "repo_rate",
-            "reverse_repo_rate",
-            "sdf_rate",
-            "msf_rate",
-            "crr",
-            "slr",
-        ],
-    },
-    "exchange_rates_parsed.csv": {
-        "date_column": "date",
-        "available_column": "fx_available_time",
-        "features": [
-            "usd_inr",
-            "gbp_inr",
-            "eur_inr",
-        ],
-    },
-}
+RBI_SERIES = {}
 
 
 # ============================================================
@@ -394,7 +371,7 @@ if __name__ == "__main__":
 
     print(
         aligned[
-            macro_columns
+            [column for column in macro_columns if column in aligned.columns]
         ].isna().sum()
     )
 

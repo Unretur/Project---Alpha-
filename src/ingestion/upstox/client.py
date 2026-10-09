@@ -1,75 +1,35 @@
+
 import requests
 
-from src.config.config import UPSTOX_ACCESS_TOKEN
-
-
 BASE_URL = "https://api.upstox.com/v2"
+BASE_URL_V3 = "https://api.upstox.com/v3"
 
 
 class UpstoxClient:
     def __init__(self, access_token: str):
+        if not access_token:
+            raise ValueError("Upstox access token is missing.")
+
         self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
-            }
-        )
+        self.session.headers.update({
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        })
 
     def get(self, endpoint: str, params: dict | None = None):
-        url = f"{BASE_URL}{endpoint}"
-
         response = self.session.get(
-            url,
+            f"{BASE_URL}{endpoint}",
             params=params,
             timeout=30,
         )
-
         response.raise_for_status()
-
-        return response.json()
-    
-    def get(self, endpoint: str, params: dict | None = None):
-        url = f"{BASE_URL}{endpoint}"
-
-        response = self.session.get(
-            url,
-            params=params,
-            timeout=30,
-        )
-
-        response.raise_for_status()
-
         return response.json()
 
     def get_v3(self, endpoint: str, params: dict | None = None):
-        url = f"https://api.upstox.com/v3{endpoint}"
-
         response = self.session.get(
-            url,
+            f"{BASE_URL_V3}{endpoint}",
             params=params,
             timeout=30,
         )
-
         response.raise_for_status()
-
         return response.json()
-
-
-client = UpstoxClient(UPSTOX_ACCESS_TOKEN)
-
-
-
-
-
-
-
-
-
-
-
-
-
-client = UpstoxClient(UPSTOX_ACCESS_TOKEN)
-
-

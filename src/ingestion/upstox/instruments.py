@@ -2,10 +2,11 @@ from src.config.config import UPSTOX_ACCESS_TOKEN
 from src.ingestion.upstox.client import UpstoxClient
 
 
-client = UpstoxClient(UPSTOX_ACCESS_TOKEN)
-
-
 def find_nifty50():
+    if not UPSTOX_ACCESS_TOKEN:
+        raise ValueError("UPSTOX_ACCESS_TOKEN is missing. Check your .env file.")
+
+    client = UpstoxClient(UPSTOX_ACCESS_TOKEN)
     params = {
         "query": "NIFTY",
         "exchanges": "NSE",

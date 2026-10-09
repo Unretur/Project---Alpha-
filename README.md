@@ -481,7 +481,9 @@ The news ingestion timestamp is when this pipeline retrieved an article, not a h
 
 FRED observation dates likewise are not publication timestamps. The current pipeline delays those observations to the next UTC midnight as a conservative same-day leakage guard. This is a provisional proxy, not exact release/vintage data; verify release timing or use point-in-time datasets before treating historical backtest performance as validated.
 
-The RBI parser expects source PDFs under `data/raw/rbi/`. If those files are unavailable, the market + FRED dataset can be built without RBI data; RBI-specific columns are then absent rather than populated with invented values.
+The RBI parser expects source PDFs under `data/raw/rbi/`. When parsed RBI CSVs are present, the dataset builder includes them automatically; otherwise it continues with market + FRED data. RBI dates are delayed to the next UTC midnight as a conservative guard, not an exact publication timestamp.
 
-Historical candle download dates can be overridden with `ALPHA_MARKET_FROM_DATE` and `ALPHA_MARKET_TO_DATE` environment variables. The default window remains 2026-01-01 through 2026-10-08.
+Current Upstox news ingestion is a prototype that queries Reliance Industries only. It does not yet represent the full NIFTY 50 news universe and should not be interpreted as market-wide news coverage.
+
+Historical candle download dates can be overridden with `ALPHA_MARKET_FROM_DATE` and `ALPHA_MARKET_TO_DATE`. The start date defaults to `2026-01-01`; the end date defaults to yesterday, avoiding a potentially incomplete current-session download.
 

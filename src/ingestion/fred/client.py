@@ -8,6 +8,10 @@ BASE_URL = "https://api.stlouisfed.org/fred"
 
 class FREDClient:
     def __init__(self, api_key: str):
+        if not api_key:
+            raise ValueError(
+                "FRED_API_KEY is missing. Set it in your .env file."
+            )
         self.session = requests.Session()
         self.api_key = api_key
 

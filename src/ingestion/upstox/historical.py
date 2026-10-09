@@ -1,8 +1,8 @@
 
 from calendar import monthrange
-from datetime import date
-from pathlib import Path
+from datetime import date, timedelta
 import os
+from pathlib import Path
 
 import pandas as pd
 
@@ -18,7 +18,10 @@ FROM_DATE = date.fromisoformat(
     os.getenv("ALPHA_MARKET_FROM_DATE", "2026-01-01")
 )
 TO_DATE = date.fromisoformat(
-    os.getenv("ALPHA_MARKET_TO_DATE", "2026-10-08")
+    os.getenv(
+        "ALPHA_MARKET_TO_DATE",
+        (date.today() - timedelta(days=1)).isoformat(),
+    )
 )
 
 OUTPUT_PATH = Path("data/raw/market/nifty50_5m.csv")

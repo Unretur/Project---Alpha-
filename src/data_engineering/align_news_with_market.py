@@ -96,7 +96,7 @@ def add_rolling_news_features(
         if right == 0:
             continue
 
-        result.loc[row_index, "latest_news_available_time"] = news.loc[
+        result.at[row_index, "latest_news_available_time"] = news.loc[
             right - 1, "available_time"
         ]
 
@@ -104,12 +104,12 @@ def add_rolling_news_features(
             lower_ns = decision_ns - int(window_delta.value)
             left = int(np.searchsorted(news_times, lower_ns, side="left"))
             count = right - left
-            result.loc[row_index, f"news_count_{window_name}"] = count
+            result.at[row_index, f"news_count_{window_name}"] = count
             if count == 0:
                 continue
             for metric, prefix in prefix_sums.items():
                 value = (prefix[right] - prefix[left]) / count
-                result.loc[row_index, f"news_{metric}_{window_name}"] = value
+                result.at[row_index, f"news_{metric}_{window_name}"] = value
 
     matched = result["latest_news_available_time"].notna()
     if matched.any():

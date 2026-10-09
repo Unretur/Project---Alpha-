@@ -29,22 +29,24 @@ def sample_dataset(rows: int = 240) -> pd.DataFrame:
         target = np.full(rows, np.nan)
         target[:-steps] = close[steps:] / close[:-steps] - 1.0
         frame[f"target_return_{horizon}m"] = target
-        frame[f"target_direction_{horizon}m"] = np.where(
-            np.isnan(target), pd.NA, np.where(target > 0, "up", np.where(target < 0, "down", "flat"))
-        )
+        frame[f"target_direction_{horizon}m"] = [
+            None if np.isnan(value) else ("up" if value > 0 else ("down" if value < 0 else "flat"))
+            for value in target
+        ]
     return frame
 
 
 class BaselineModelTests(unittest.TestCase):
     def test_features_exclude_targets_metadata_and_are_lagged(self):
-        feature_frame, features = build_feature_frame(sample_dataset())
+        source = sample_dataset()
+        feature_frame, features = build_feature_frame(source)
         self.assertTrue(features)
         self.assertFalse(any(name.startswith("target_") for name in features))
         self.assertFalse(any(name.endswith("_available_time") for name in features))
         self.assertTrue(np.isnan(feature_frame.loc[1, "close_return_lag_1"]))
         self.assertAlmostEqual(
             feature_frame.loc[2, "close_return_lag_1"],
-            feature_frame.loc[1, "close"] / feature_frame.loc[0, "close"] - 1.0,
+            source.loc[1, "close"] / source.loc[0, "close"] - 1.0,
         )
 
     def test_chronological_splits_are_ordered_and_purged(self):

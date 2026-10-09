@@ -1,3 +1,5 @@
+from datetime import date
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -20,8 +22,10 @@ def download_fred_series(
         "/series/observations",
         params={
             "series_id": series_id,
-            "observation_start": "2020-01-01",
-            "observation_end": "2026-10-08",
+            "observation_start": os.getenv("FRED_OBSERVATION_START", "2020-01-01"),
+            "observation_end": os.getenv(
+                "FRED_OBSERVATION_END", date.today().isoformat()
+            ),
         },
     )
 

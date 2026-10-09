@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.config.config import FRED_API_KEY
 from src.ingestion.fred.client import client
 
 

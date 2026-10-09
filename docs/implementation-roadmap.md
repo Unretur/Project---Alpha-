@@ -9,10 +9,10 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - Research/specification: defined
 - Repository: connected; use feature branches and pull requests for changes
 - Primary market-data API for V1: Upstox
-- Development phase: data-pipeline validation and training-target construction
+- Development phase: baseline model implementation and evaluation
 - Trading mode: paper trading only
-- Implemented: Upstox historical NIFTY candles, FRED ingestion, optional parsed RBI alignment, prototype Upstox news ingestion, FinBERT inference, rolling news features, automated tests, and exact-timestamp forward-return target generation
-- Known limitations: news is currently Reliance-specific and has no overlap with the available historical market window; FRED/RBI availability timestamps are conservative proxies, not exact point-in-time release metadata; no validated historical model/backtest yet
+- Implemented: Upstox historical NIFTY candles, FRED ingestion, optional parsed RBI alignment, prototype Upstox news ingestion, FinBERT inference, rolling news features, automated tests, exact-timestamp forward-return target generation, and an initial leakage-conscious Ridge baseline
+- Known limitations: news is currently Reliance-specific and has no overlap with the available historical market window; FRED/RBI availability timestamps are conservative proxies, not exact point-in-time release metadata; no validated historical trading backtest yet
 
 ## Phase 1 — Upstox API
 
@@ -22,7 +22,7 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] Obtain client credentials
 - [ ] Implement OAuth/authentication flow
 - [ ] Obtain access token securely
-- [ ] Store secrets outside Git
+- [x] Store secrets outside Git
 
 ### Step 2 — First Market Data Call
 - [x] Identify NIFTY instrument key
@@ -67,10 +67,13 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 
 ## Phase 4 — ML
 - [x] Implement exact-timestamp 5m/15m/30m forward-return target generation
-- [ ] Run target generation and validate target coverage
-- [ ] Build and validate model feature set (exclude target and availability metadata)
-- [ ] Time-series split
-- [ ] Baseline models
+- [x] Run target generation and inspect valid-target counts
+- [x] Implement model feature construction that excludes targets and availability-time metadata
+- [x] Implement chronological train/validation/test splitting with horizon purging
+- [x] Implement initial Ridge regression baselines for 5m/15m/30m returns
+- [ ] Run baseline locally on the current dataset and review metrics
+- [ ] Compare model performance with zero-return baseline
+- [ ] Improve/validate macro point-in-time assumptions
 - [ ] Alpha prediction model
 - [ ] Probability/calibration evaluation
 
@@ -117,4 +120,4 @@ Merge to main after checks pass
 Do not commit API keys, client secrets, access tokens, TOTP secrets, or other credentials.
 
 ## Immediate Next Action
-Run the target-generation module locally, inspect valid-target counts, and validate the resulting dataset before defining model features or training a baseline.
+Pull the baseline-modeling branch, run the baseline tests, then train/evaluate the three return-horizon baselines on the local training dataset. Review metrics against the zero-return baseline before starting trading backtests.

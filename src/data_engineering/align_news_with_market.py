@@ -70,7 +70,9 @@ def add_rolling_news_features(
         for metric in ("positive_mean", "neutral_mean", "negative_mean", "sentiment_net_mean"):
             result[f"news_{metric}_{window_name}"] = np.nan
 
-    result["latest_news_available_time"] = pd.NaT
+    result["latest_news_available_time"] = pd.Series(
+        pd.NaT, index=result.index, dtype="datetime64[ns, UTC]"
+    )
     if news.empty or result.empty:
         return result
 

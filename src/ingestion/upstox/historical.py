@@ -11,8 +11,16 @@ from src.ingestion.upstox.client import UpstoxClient
 INSTRUMENT_KEY = "NSE_INDEX|Nifty 50"
 INTERVAL = 5
 
-FROM_DATE = date(2026, 1, 1)
-TO_DATE = date(2026, 10, 8)
+# Override with ALPHA_MARKET_FROM_DATE / ALPHA_MARKET_TO_DATE when needed.
+# Defaults preserve the currently requested historical window.
+import os
+
+FROM_DATE = date.fromisoformat(
+    os.getenv("ALPHA_MARKET_FROM_DATE", "2026-01-01")
+)
+TO_DATE = date.fromisoformat(
+    os.getenv("ALPHA_MARKET_TO_DATE", "2026-10-08")
+)
 
 OUTPUT_PATH = Path("data/raw/market/nifty50_5m.csv")
 
@@ -22,6 +30,9 @@ def main():
         raise ValueError(
             "UPSTOX_ALGO_ACCESS_TOKEN is missing. Check your .env file."
         )
+
+    if FROM_DATE > TO_DATE:
+        raise ValueError("ALPHA_MARKET_FROM_DATE must be on or before ALPHA_MARKET_TO_DATE.")
 
     client = UpstoxClient(UPSTOX_ALGO_ACCESS_TOKEN)
     all_candles = []
@@ -79,7 +90,14 @@ def main():
     df["timestamp"] = pd.to_datetime(
         df["timestamp"], utc=True, errors="coerce"
     )
-    df = df.dropna(subset=["timestamp"])
+    for column in ["open", "high", "low", "close", "volume", "open_interest"]:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+
+    df = df.dropna(subset=["timestamp", "open", "high", "low", "close"])
+    df = df.loc[
+        (df["timestamp"].dt.date >= FROM_DATE)
+        & (df["timestamp"].dt.date <= TO_DATE)
+    ].copy()
     df = df.drop_duplicates(subset=["timestamp"])
     df = df.sort_values("timestamp").reset_index(drop=True)
 

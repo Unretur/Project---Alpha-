@@ -60,6 +60,7 @@ def add_rolling_news_features(
         news.dropna(subset=[
             "news_positive", "news_neutral", "news_negative", "news_sentiment_net"
         ])
+        .drop_duplicates(subset=["article_url"], keep="first")
         .sort_values("available_time")
         .reset_index(drop=True)
     )
@@ -76,8 +77,22 @@ def add_rolling_news_features(
     if news.empty or result.empty:
         return result
 
-    news_times = news["available_time"].astype("int64").to_numpy()
-    decision_times = result["timestamp"].astype("int64").to_numpy()
+    # Explicitly normalize to nanoseconds. Pandas may otherwise use
+    # microsecond-resolution integer values, which would mismatch Timedelta.value.
+    news_times = (
+        news["available_time"]
+        .dt.tz_convert("UTC")
+        .dt.tz_localize(None)
+        .to_numpy(dtype="datetime64[ns]")
+        .astype("int64")
+    )
+    decision_times = (
+        result["timestamp"]
+        .dt.tz_convert("UTC")
+        .dt.tz_localize(None)
+        .to_numpy(dtype="datetime64[ns]")
+        .astype("int64")
+    )
     metric_columns = {
         "positive_mean": "news_positive",
         "neutral_mean": "news_neutral",

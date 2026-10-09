@@ -1,17 +1,39 @@
-
 from pathlib import Path
 
 import pandas as pd
 
 from src.data_engineering.validation import validate_no_lookahead
 
+
 MARKET_PATH = Path("data/processed/nifty_macro_aligned.csv")
 NEWS_PATH = Path("data/processed/news/news_features.csv")
 OUTPUT_PATH = Path("data/processed/nifty_with_news.csv")
 
-def main():
+
+def main() -> None:
+    if not MARKET_PATH.is_file():
+        raise FileNotFoundError(f"Market dataset not found: {MARKET_PATH}")
+    if not NEWS_PATH.is_file():
+        raise FileNotFoundError(f"News features not found: {NEWS_PATH}")
+
     market = pd.read_csv(MARKET_PATH)
     news = pd.read_csv(NEWS_PATH)
+
+    required_market = {"timestamp"}
+    required_news = {
+        "available_time",
+        "news_positive_mean",
+        "news_negative_mean",
+        "news_neutral_mean",
+        "news_sentiment_net",
+        "news_article_count",
+    }
+    missing_market = required_market.difference(market.columns)
+    missing_news = required_news.difference(news.columns)
+    if missing_market:
+        raise ValueError(f"Market dataset missing columns: {sorted(missing_market)}")
+    if missing_news:
+        raise ValueError(f"News feature dataset missing columns: {sorted(missing_news)}")
 
     market["timestamp"] = pd.to_datetime(
         market["timestamp"], utc=True, errors="coerce"
@@ -24,10 +46,11 @@ def main():
     news = news.dropna(subset=["available_time"]).sort_values("available_time")
 
     if market.empty:
-        raise ValueError("Market dataset is empty.")
+        raise ValueError("Market dataset has no valid timestamps.")
     if news.empty:
-        raise ValueError("News feature dataset is empty.")
+        raise ValueError("News feature dataset has no valid availability timestamps.")
 
+    # Require a strictly prior-or-equal news availability timestamp.
     aligned = pd.merge_asof(
         market,
         news,
@@ -38,7 +61,6 @@ def main():
     )
 
     matched = aligned["available_time"].notna()
-
     if matched.any():
         validate_no_lookahead(
             aligned.loc[matched],
@@ -56,6 +78,7 @@ def main():
     print("Candles without prior news features:", int((~matched).sum()))
     print("Output shape:", aligned.shape)
     print("Saved:", OUTPUT_PATH)
+
 
 if __name__ == "__main__":
     main()

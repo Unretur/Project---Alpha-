@@ -2,6 +2,7 @@
 from calendar import monthrange
 from datetime import date
 from pathlib import Path
+import os
 
 import pandas as pd
 
@@ -13,8 +14,6 @@ INTERVAL = 5
 
 # Override with ALPHA_MARKET_FROM_DATE / ALPHA_MARKET_TO_DATE when needed.
 # Defaults preserve the currently requested historical window.
-import os
-
 FROM_DATE = date.fromisoformat(
     os.getenv("ALPHA_MARKET_FROM_DATE", "2026-01-01")
 )

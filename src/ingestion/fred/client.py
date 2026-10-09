@@ -22,6 +22,11 @@ class FREDClient:
             "file_type": "json",
         }
 
+        if not self.api_key:
+            raise ValueError(
+                "FRED_API_KEY is missing. Set it in your .env file."
+            )
+
         response = self.session.get(
             f"{BASE_URL}{endpoint}",
             params=params,

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "fix/**"
+      - "feat/**"
   pull_request:
     branches:
       - main
@@ -31,3 +32,4 @@ jobs:
         run: |
           python -m unittest src.data_engineering.test_news_features
           python -m unittest src.data_engineering.test_options_selection
+          python -m unittest src.data_engineering.test_create_targets

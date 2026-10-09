@@ -1,20 +1,18 @@
 # Project Alpha — Implementation Roadmap
 
 ## Purpose
-
 This document is the execution checklist for Project Alpha after research and repository setup.
 
 The GitHub repository is the source of truth. Work proceeds component-by-component, with each integration tested before the next layer is built.
 
 ## Current State
-
 - Research/specification: defined
 - Repository: connected; use feature branches and pull requests for changes
 - Primary market-data API for V1: Upstox
-- Development phase: data-ingestion and alignment validation
+- Development phase: data-pipeline validation and training-target construction
 - Trading mode: paper trading only
-- Implemented: Upstox authentication check, NIFTY 50 historical candles, FRED ingestion, optional parsed RBI alignment, Upstox news ingestion prototype, FinBERT inference, rolling news features, and basic automated unit tests
-- Known limitations: news is currently Reliance-specific; FRED/RBI availability timestamps are conservative proxies, not exact point-in-time release metadata; no validated historical model/backtest yet
+- Implemented: Upstox historical NIFTY candles, FRED ingestion, optional parsed RBI alignment, prototype Upstox news ingestion, FinBERT inference, rolling news features, automated tests, and exact-timestamp forward-return target generation
+- Known limitations: news is currently Reliance-specific and has no overlap with the available historical market window; FRED/RBI availability timestamps are conservative proxies, not exact point-in-time release metadata; no validated historical model/backtest yet
 
 ## Phase 1 — Upstox API
 
@@ -50,7 +48,6 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] Persist raw events
 
 ## Phase 2 — Data Pipeline
-
 - [x] Local raw-data storage
 - [x] Basic data validation
 - [x] Timestamp normalization
@@ -60,7 +57,6 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] S3 storage
 
 ## Phase 3 — News + Macro + FinBERT
-
 - [x] Implement prototype Upstox news ingestion (Reliance-only scope)
 - [x] Implement FRED macro ingestion
 - [x] Add optional parsed RBI CSV alignment
@@ -70,16 +66,15 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] Select and integrate a historical point-in-time news source before news-based backtesting
 
 ## Phase 4 — ML
-
-- [ ] Build training dataset
-- [ ] Create 5m/15m/30m targets
+- [x] Implement exact-timestamp 5m/15m/30m forward-return target generation
+- [ ] Run target generation and validate target coverage
+- [ ] Build and validate model feature set (exclude target and availability metadata)
 - [ ] Time-series split
 - [ ] Baseline models
 - [ ] Alpha prediction model
 - [ ] Probability/calibration evaluation
 
 ## Phase 5 — Trading Research
-
 - [ ] Signal engine
 - [ ] Risk rules
 - [ ] Option selection
@@ -88,7 +83,6 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] Out-of-sample validation
 
 ## Phase 6 — Paper Trading
-
 - [ ] Live feature pipeline
 - [ ] Live inference
 - [ ] Autonomous paper signals
@@ -97,7 +91,6 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] Immutable prediction/trade records
 
 ## Phase 7 — Deployment
-
 - [ ] AWS infrastructure
 - [ ] Secrets management
 - [ ] Logging/monitoring
@@ -106,9 +99,7 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] Production-style health checks
 
 ## Git Workflow
-
 Each component should follow:
-
 ```text
 Implement on feature branch
   ↓
@@ -126,9 +117,4 @@ Merge to main after checks pass
 Do not commit API keys, client secrets, access tokens, TOTP secrets, or other credentials.
 
 ## Immediate Next Action
-
-**Create/configure the Upstox developer application and implement the authentication flow.**
-
-The first success milestone is:
-
-> Python authenticates successfully and retrieves real NIFTY market data from Upstox.
+Run the target-generation module locally, inspect valid-target counts, and validate the resulting dataset before defining model features or training a baseline.

@@ -1,21 +1,14 @@
-
 from pathlib import Path
 
 import pandas as pd
 
 
-INPUT_PATH = Path(
-    "data/processed/news/finbert_sentiment.csv"
-)
-
-OUTPUT_PATH = Path(
-    "data/processed/news/news_features.csv"
-)
+INPUT_PATH = Path("data/processed/news/finbert_sentiment.csv")
+OUTPUT_PATH = Path("data/processed/news/news_features.csv")
 
 
-def build_news_features(
-    news: pd.DataFrame,
-) -> pd.DataFrame:
+def build_news_features(news: pd.DataFrame) -> pd.DataFrame:
+    """Normalize article-level FinBERT scores while preserving availability time."""
     required = {
         "published_time",
         "ingested_at",
@@ -24,113 +17,80 @@ def build_news_features(
         "negative",
         "article_url",
     }
-
     missing = required.difference(news.columns)
-
     if missing:
-        raise ValueError(
-            f"Missing required columns: {sorted(missing)}"
-        )
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
 
     result = news.copy()
-
     result["published_time"] = pd.to_datetime(
-        result["published_time"],
-        utc=True,
-        errors="coerce",
+        result["published_time"], utc=True, errors="coerce"
     )
-
     result["ingested_at"] = pd.to_datetime(
-        result["ingested_at"],
-        utc=True,
-        errors="coerce",
+        result["ingested_at"], utc=True, errors="coerce"
     )
-
-    for column in ["positive", "neutral", "negative"]:
-        result[column] = pd.to_numeric(
-            result[column],
-            errors="coerce",
-        )
+    for column in ("positive", "neutral", "negative"):
+        result[column] = pd.to_numeric(result[column], errors="coerce")
 
     result = result.dropna(
         subset=[
-            "published_time",
-            "ingested_at",
-            "positive",
-            "neutral",
-            "negative",
+            "published_time", "ingested_at", "positive", "neutral", "negative",
+            "article_url",
         ]
-    )
+    ).copy()
+    result = result.loc[result["article_url"].astype(str).str.strip().ne("")].copy()
 
-    # An empty but correctly shaped result is valid when no
-    # usable articles were returned in this ingestion run.
+    columns = [
+        "article_url",
+        "published_time",
+        "ingested_at",
+        "available_time",
+        "news_positive",
+        "news_neutral",
+        "news_negative",
+        "news_sentiment_net",
+    ]
+    # Keep an empty but valid schema if an ingestion run has no usable articles.
     if result.empty:
-        return pd.DataFrame(
-            columns=[
-                "available_time",
-                "news_positive_mean",
-                "news_negative_mean",
-                "news_neutral_mean",
-                "news_sentiment_net",
-                "news_article_count",
-            ]
-        )
+        return pd.DataFrame(columns=columns)
 
-    # A conservative availability proxy: the article must
-    # have been published and retrieved by our ingestion run.
-    # This is NOT proof of the provider's original availability.
+    # Retrieval time is a conservative availability proxy, not original
+    # provider-availability proof. Never use an article before retrieval.
     result["available_time"] = result[
         ["published_time", "ingested_at"]
     ].max(axis=1)
 
-    # Avoid counting duplicate URLs more than once.
-    result = result.drop_duplicates(
-        subset=["article_url"],
-        keep="first",
-    )
+    result = result.drop_duplicates(subset=["article_url"], keep="first").copy()
+    result["news_positive"] = result["positive"]
+    result["news_neutral"] = result["neutral"]
+    result["news_negative"] = result["negative"]
+    result["news_sentiment_net"] = result["positive"] - result["negative"]
 
-    result["sentiment_net"] = (
-        result["positive"] - result["negative"]
-    )
+    # Retain useful metadata when the source dataset provides it.
+    for optional_column in ("headline", "source", "instrument_key"):
+        if optional_column in result.columns:
+            columns.insert(0, optional_column)
 
-    # Aggregate articles with the same availability timestamp.
-    features = (
-        result.groupby("available_time", as_index=False)
-        .agg(
-            news_positive_mean=("positive", "mean"),
-            news_negative_mean=("negative", "mean"),
-            news_neutral_mean=("neutral", "mean"),
-            news_sentiment_net=("sentiment_net", "mean"),
-            news_article_count=("article_url", "nunique"),
-        )
-        .sort_values("available_time")
+    return (
+        result[columns]
+        .sort_values(["available_time", "article_url"])
         .reset_index(drop=True)
     )
 
-    return features
-
 
 def main() -> None:
-    news = pd.read_csv(INPUT_PATH)
+    if not INPUT_PATH.is_file():
+        raise FileNotFoundError(f"FinBERT sentiment dataset not found: {INPUT_PATH}")
 
+    news = pd.read_csv(INPUT_PATH)
     features = build_news_features(news)
 
-    OUTPUT_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    features.to_csv(
-        OUTPUT_PATH,
-        index=False,
-    )
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    features.to_csv(OUTPUT_PATH, index=False)
 
     print("News feature generation completed.")
-    print("Input articles:", len(news))
-    print("Feature rows:", len(features))
+    print("Input rows:", len(news))
+    print("Usable unique articles:", len(features))
     print("Columns:", features.columns.tolist())
-    print("\nFeatures:")
-    print(features.to_string(index=False))
     print("\nSaved:", OUTPUT_PATH)
 
 

@@ -34,7 +34,23 @@ FRED_SERIES = {
 # RBI SERIES
 # ============================================================
 
-RBI_SERIES = {}
+# Parsed RBI CSVs are optional: if present, they are included automatically.
+# Their dates are conservatively delayed by one UTC day in load_rbi_file.
+RBI_SERIES = {
+    "policy_rates_parsed.csv": {
+        "date_column": "effective_date",
+        "available_column": "policy_available_time",
+        "features": [
+            "bank_rate", "repo_rate", "reverse_repo_rate",
+            "sdf_rate", "msf_rate", "crr", "slr",
+        ],
+    },
+    "exchange_rates_parsed.csv": {
+        "date_column": "date",
+        "available_column": "rbi_fx_available_time",
+        "features": ["usd_inr", "gbp_inr", "eur_inr"],
+    },
+}
 
 
 # ============================================================
@@ -56,6 +72,12 @@ def load_fred_series(
         df,
         "date",
     )
+
+    # FRED's observation date is not its intraday publication timestamp.
+    # Use the next UTC midnight as a conservative availability proxy to
+    # prevent using a same-day observation in an earlier market session.
+    # This is a guard against obvious same-day leakage, not exact vintage data.
+    df["date"] = df["date"] + pd.Timedelta(days=1)
 
     df = sort_by_datetime(
         df,
@@ -94,10 +116,23 @@ def load_rbi_file(
 
     df = pd.read_csv(path)
 
+    missing_columns = {
+        date_column, *features
+    }.difference(df.columns)
+    if missing_columns:
+        raise ValueError(
+            f"RBI file {path} is missing columns: {sorted(missing_columns)}"
+        )
+
     df = normalize_datetime(
         df,
         date_column,
     )
+
+    # Parsed RBI dates are not intraday publication timestamps. Delay one
+    # calendar day to avoid using a same-day value before it could be known.
+    # This is a conservative proxy, not point-in-time RBI release metadata.
+    df[date_column] = df[date_column] + pd.Timedelta(days=1)
 
     df = sort_by_datetime(
         df,
@@ -239,6 +274,11 @@ if __name__ == "__main__":
 
     for filename, config in RBI_SERIES.items():
 
+        rbi_path = Path("data/raw/rbi") / filename
+        if not rbi_path.is_file():
+            print(f"  - Skipping {filename}: parsed RBI file not found")
+            continue
+
         available_column = config[
             "available_column"
         ]
@@ -286,22 +326,21 @@ if __name__ == "__main__":
     # 5. Resolve duplicate USD/INR columns
     # --------------------------------------------------------
 
-    # FRED provides usd_inr and RBI exchange rates also
-    # provides usd_inr. Pandas therefore creates _x and _y.
-    # Rename them explicitly so the final dataset is clear.
-
+    # When RBI exchange rates are enabled, both providers may
+    # supply USD/INR. Rename the result without assuming RBI data
+    # is present in every development environment.
     if "usd_inr_x" in aligned.columns:
         aligned = aligned.rename(
-            columns={
-                "usd_inr_x": "usd_inr_fred"
-            }
+            columns={"usd_inr_x": "usd_inr_fred"}
+        )
+    elif "usd_inr" in aligned.columns:
+        aligned = aligned.rename(
+            columns={"usd_inr": "usd_inr_fred"}
         )
 
     if "usd_inr_y" in aligned.columns:
         aligned = aligned.rename(
-            columns={
-                "usd_inr_y": "usd_inr_rbi"
-            }
+            columns={"usd_inr_y": "usd_inr_rbi"}
         )
 
     # --------------------------------------------------------
@@ -328,7 +367,7 @@ if __name__ == "__main__":
 
     print()
     print("=" * 60)
-    print("NIFTY + FRED + RBI ALIGNMENT COMPLETED")
+    print("NIFTY + FRED + OPTIONAL RBI ALIGNMENT COMPLETED")
     print("=" * 60)
 
     print()
@@ -382,23 +421,24 @@ if __name__ == "__main__":
     print()
     print("First 5 rows:")
 
-    print(
-        aligned[
-            [
-                "timestamp",
-                "close",
-                "vix",
-                "us10y",
-                "fed_funds",
-                "usd_inr_fred",
-                "usd_inr_rbi",
-                "repo_rate",
-                "crr",
-                "gbp_inr",
-                "eur_inr",
-            ]
-        ].head()
-    )
+    display_columns = [
+        "timestamp",
+        "close",
+        "vix",
+        "us10y",
+        "fed_funds",
+        "usd_inr_fred",
+        "usd_inr_rbi",
+        "repo_rate",
+        "crr",
+        "gbp_inr",
+        "eur_inr",
+    ]
+    display_columns = [
+        column for column in display_columns
+        if column in aligned.columns
+    ]
+    print(aligned[display_columns].head().to_string(index=False))
 
     # --------------------------------------------------------
     # Final validation

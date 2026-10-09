@@ -1,41 +1,45 @@
 import requests
 
+from src.config.config import ALPHA_VANTAGE_API_KEY
 
-BASE_URL = "https://api.upstox.com/v2"
+
+BASE_URL = "https://www.alphavantage.co/query"
 
 
-class UpstoxClient:
-    def __init__(self, access_token: str):
+class AlphaVantageClient:
+    """Small Alpha Vantage REST client; callers provide the API function parameters."""
+
+    def __init__(self, api_key: str | None = ALPHA_VANTAGE_API_KEY):
         self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
-            }
-        )
+        self.api_key = api_key
 
-    def get(self, endpoint: str, params: dict | None = None):
-        url = f"{BASE_URL}{endpoint}"
+    def get(self, params: dict | None = None) -> dict:
+        if not self.api_key:
+            raise ValueError(
+                "ALPHA_VANTAGE_API_KEY is missing. Set it in your .env file."
+            )
 
+        query_params = {
+            **(params or {}),
+            "apikey": self.api_key,
+        }
         response = self.session.get(
-            url,
-            params=params,
+            BASE_URL,
+            params=query_params,
             timeout=30,
         )
-
         response.raise_for_status()
 
-        return response.json()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Alpha Vantage returned an unexpected response format.")
 
-    def get_v3(self, endpoint: str, params: dict | None = None):
-        url = f"https://api.upstox.com/v3{endpoint}"
-
-        response = self.session.get(
-            url,
-            params=params,
-            timeout=30,
+        api_error = (
+            payload.get("Error Message")
+            or payload.get("Note")
+            or payload.get("Information")
         )
+        if api_error:
+            raise RuntimeError(f"Alpha Vantage API response: {api_error}")
 
-        response.raise_for_status()
-
-        return response.json()
+        return payload

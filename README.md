@@ -449,3 +449,49 @@ Only after this succeeds should the next API/data component be implemented.
 ## Disclaimer
 
 Project Alpha is an experimental research and engineering project. Historical backtest results and paper-trading results do not guarantee future performance. No real-money trading is performed during the initial validation phase.
+
+## Local data-ingestion workflow
+
+Run commands from the repository root in the same Python environment used for the project.
+
+Create the environment and install the project's runtime dependencies (PowerShell):
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+1. Configure local credentials in `.env` (copy `.env.example` and use the variable names documented by `src/config/config.py`). Never commit `.env`.
+2. Download FRED observations:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.ingestion.fred.download_macro
+   ```
+3. Download NIFTY 50 5-minute candles:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.ingestion.upstox.historical
+   ```
+4. Build the market + macro dataset:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.data_engineering.build_aligned_dataset
+   ```
+5. Fetch news and run FinBERT:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.ingestion.upstox.news
+   .\.venv\Scripts\python.exe -m src.ingestion.upstox.run_finbert
+   .\.venv\Scripts\python.exe -m src.data_engineering.news_features
+   .\.venv\Scripts\python.exe -m src.data_engineering.align_news_with_market
+   ```
+
+### Important data-timing limitation
+
+The news ingestion timestamp is when this pipeline retrieved an article, not a historical archive of when the provider first made the article available. Therefore, this news dataset is not sufficient on its own to claim a point-in-time-valid historical backtest. The alignment code generates rolling 5-, 15-, and 30-minute sentiment features from articles whose recorded availability time is no later than the decision candle, but that check does not recover original historical availability. Use timestamped historical news data before making backtest claims that depend on news.
+
+FRED observation dates likewise are not publication timestamps. The current pipeline delays those observations to the next UTC midnight as a conservative same-day leakage guard. This is a provisional proxy, not exact release/vintage data; verify release timing or use point-in-time datasets before treating historical backtest performance as validated.
+
+The RBI parser expects source PDFs under `data/raw/rbi/`. When parsed RBI CSVs are present, the dataset builder includes them automatically; otherwise it continues with market + FRED data. RBI dates are delayed to the next UTC midnight as a conservative guard, not an exact publication timestamp.
+
+Current Upstox news ingestion is a prototype that queries Reliance Industries only. It does not yet represent the full NIFTY 50 news universe and should not be interpreted as market-wide news coverage.
+
+Historical candle download dates can be overridden with `ALPHA_MARKET_FROM_DATE` and `ALPHA_MARKET_TO_DATE`. The start date defaults to `2026-01-01`; the end date defaults to yesterday, avoiding a potentially incomplete current-session download.
+

@@ -1,7 +1,10 @@
+from datetime import date
+import os
 from pathlib import Path
 
 import pandas as pd
 
+from src.config.config import FRED_API_KEY
 from src.ingestion.fred.client import client
 
 
@@ -10,12 +13,19 @@ def download_fred_series(
     output_path: Path,
 ) -> pd.DataFrame:
 
+    if not FRED_API_KEY:
+        raise ValueError(
+            "FRED_API_KEY is missing. Set it in your .env file."
+        )
+
     response = client.get(
         "/series/observations",
         params={
             "series_id": series_id,
-            "observation_start": "2020-01-01",
-            "observation_end": "2026-10-08",
+            "observation_start": os.getenv("FRED_OBSERVATION_START", "2020-01-01"),
+            "observation_end": os.getenv(
+                "FRED_OBSERVATION_END", date.today().isoformat()
+            ),
         },
     )
 

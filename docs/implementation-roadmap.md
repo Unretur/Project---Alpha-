@@ -8,12 +8,13 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 
 ## Current State
 
-- Research/specification: complete
-- Repository: connected
-- Branch: main
+- Research/specification: defined
+- Repository: connected; use feature branches and pull requests for changes
 - Primary market-data API for V1: Upstox
-- Development phase: API implementation
+- Development phase: data-ingestion and alignment validation
 - Trading mode: paper trading only
+- Implemented: Upstox authentication check, NIFTY 50 historical candles, FRED ingestion, optional parsed RBI alignment, Upstox news ingestion prototype, FinBERT inference, rolling news features, and basic automated unit tests
+- Known limitations: news is currently Reliance-specific; FRED/RBI availability timestamps are conservative proxies, not exact point-in-time release metadata; no validated historical model/backtest yet
 
 ## Phase 1 — Upstox API
 
@@ -26,14 +27,15 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 - [ ] Store secrets outside Git
 
 ### Step 2 — First Market Data Call
-- [ ] Identify NIFTY instrument key
-- [ ] Request NIFTY market data
-- [ ] Parse response
-- [ ] Validate timestamp and price fields
-- [ ] Write a minimal integration test
+- [x] Identify NIFTY instrument key
+- [x] Validate authenticated Upstox profile request
+- [x] Parse historical candle response
+- [x] Normalize timestamps and remove duplicate candles
+- [ ] Validate market-session coverage against an exchange calendar
+- [ ] Add an authenticated integration test that can run with local credentials
 
 ### Step 3 — Historical Data
-- [ ] Historical NIFTY candles
+- [x] Historical NIFTY candles
 - [ ] Historical futures data
 - [ ] Historical options/option-chain data
 - [ ] OI/IV/Greeks where available
@@ -49,21 +51,23 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 
 ## Phase 2 — Data Pipeline
 
-- [ ] Raw-data storage
-- [ ] Data validation
-- [ ] Timestamp normalization
-- [ ] Availability-time handling
-- [ ] Feature snapshots
+- [x] Local raw-data storage
+- [x] Basic data validation
+- [x] Timestamp normalization
+- [x] Conservative availability-time guards
+- [x] Rolling time-windowed news features
+- [ ] Build and validate a versioned feature snapshot contract
 - [ ] S3 storage
 
 ## Phase 3 — News + Macro + FinBERT
 
-- [ ] Select free V1 news provider
-- [ ] Implement news ingestion
-- [ ] Implement macro ingestion
-- [ ] Enforce publication/availability timestamps
-- [ ] Run FinBERT
-- [ ] Aggregate sentiment into time-aware features
+- [x] Implement prototype Upstox news ingestion (Reliance-only scope)
+- [x] Implement FRED macro ingestion
+- [x] Add optional parsed RBI CSV alignment
+- [x] Add conservative publication/availability-time guards
+- [x] Run FinBERT inference
+- [x] Aggregate sentiment into 5m/15m/30m rolling features
+- [ ] Select and integrate a historical point-in-time news source before news-based backtesting
 
 ## Phase 4 — ML
 
@@ -106,15 +110,17 @@ The GitHub repository is the source of truth. Work proceeds component-by-compone
 Each component should follow:
 
 ```text
-Implement
+Implement on feature branch
   ↓
-Test
+Add / update tests
   ↓
-Review
+Run automated checks
   ↓
-Commit
+Review the diff
   ↓
-Push to main
+Open pull request
+  ↓
+Merge to main after checks pass
 ```
 
 Do not commit API keys, client secrets, access tokens, TOTP secrets, or other credentials.

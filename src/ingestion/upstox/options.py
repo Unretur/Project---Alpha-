@@ -1,85 +1,137 @@
+from datetime import date
+from typing import Any
+
 from src.config.config import UPSTOX_ACCESS_TOKEN
 from src.ingestion.upstox.client import UpstoxClient
 
 
-client = UpstoxClient(UPSTOX_ACCESS_TOKEN)
-
 NIFTY_50_INSTRUMENT_KEY = "NSE_INDEX|Nifty 50"
 
-params = {
-    "instrument_key": NIFTY_50_INSTRUMENT_KEY
-}
 
-response = client.get("/option/contract", params=params)
-
-contracts = response["data"]
-
-print("Total contracts:", len(contracts))
-first_contract = contracts[0]
-
-print("Instrument Key:", first_contract["instrument_key"])
-print("Strike Price:", first_contract["strike_price"])
-print("Option Type:", first_contract["instrument_type"])
-print("Expiry:", first_contract["expiry"])
-print("Lot Size:", first_contract["lot_size"])
-print("Weekly:", first_contract["weekly"])
+def _parse_expiry(value: Any) -> date | None:
+    if value is None:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
 
 
+def _is_weekly(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes"}
+    if isinstance(value, (int, float)):
+        return value == 1
+    return False
 
 
-print("Upstox options client connected")
+def select_atm_call_put(
+    contracts: list[dict],
+    nifty_price: float,
+    as_of_date: date | None = None,
+) -> tuple[dict, dict]:
+    """Select a CE/PE pair at the closest strike for the nearest eligible weekly expiry."""
+    if not contracts:
+        raise ValueError("Upstox returned no option contracts.")
+    if nifty_price <= 0:
+        raise ValueError("NIFTY price must be greater than zero.")
 
-price_params = {
-    "instrument_key": NIFTY_50_INSTRUMENT_KEY,
-    "interval": "I1"
-}
+    decision_date = as_of_date or date.today()
+    dated_contracts: list[tuple[date, dict]] = []
+    for contract in contracts:
+        expiry = _parse_expiry(contract.get("expiry"))
+        if expiry is not None and expiry >= decision_date:
+            dated_contracts.append((expiry, contract))
 
-price_response = client.get(
-    "/market-quote/ohlc",
-    params=price_params
-)
+    if not dated_contracts:
+        raise ValueError("No option contracts with unexpired, valid expiry dates are available.")
 
-nifty_data = price_response["data"]
+    # Weekly CE/PE is the stated execution instrument. If the provider's
+    # response exposes a weekly flag, require it to be true; don't silently
+    # select a monthly or unclassified contract instead.
+    has_weekly_metadata = any("weekly" in contract for _, contract in dated_contracts)
+    if not has_weekly_metadata:
+        raise ValueError(
+            "Option contract response lacks a weekly flag; refusing to assume a contract is weekly."
+        )
 
-print("NIFTY market data:", nifty_data)
+    eligible = [
+        (expiry, contract)
+        for expiry, contract in dated_contracts
+        if "weekly" in contract and _is_weekly(contract.get("weekly"))
+    ]
+    if not eligible:
+        raise ValueError("No unexpired weekly option contracts are available.")
 
-# Current NIFTY price
-nifty_price = nifty_data["NSE_INDEX:Nifty 50"]["last_price"]
+    # Never mix strikes from different expiries in one CE/PE pair.
+    nearest_expiry = min(expiry for expiry, _ in eligible)
+    expiry_contracts = [
+        contract for expiry, contract in eligible if expiry == nearest_expiry
+    ]
 
-# Build a map of strikes containing CE and PE
-strike_map = {}
+    strike_map: dict[float, dict[str, dict]] = {}
+    for contract in expiry_contracts:
+        try:
+            strike = float(contract["strike_price"])
+            option_type = contract["instrument_type"]
+        except (KeyError, TypeError, ValueError):
+            continue
 
-for contract in contracts:
-    strike = contract["strike_price"]
-    option_type = contract["instrument_type"]
+        if option_type in ("CE", "PE"):
+            strike_map.setdefault(strike, {})[option_type] = contract
 
-    if option_type in ["CE", "PE"]:
-        if strike not in strike_map:
-            strike_map[strike] = {}
+    valid_strikes = [
+        strike for strike, options in strike_map.items()
+        if "CE" in options and "PE" in options
+    ]
+    if not valid_strikes:
+        raise ValueError(
+            f"No CE/PE pair is available for expiry {nearest_expiry.isoformat()}."
+        )
 
-        strike_map[strike][option_type] = contract
+    atm_strike = min(valid_strikes, key=lambda strike: abs(strike - nifty_price))
+    return strike_map[atm_strike]["CE"], strike_map[atm_strike]["PE"]
 
-# Keep only strikes where BOTH CE and PE exist
-valid_strikes = [
-    strike
-    for strike, options_at_strike in strike_map.items()
-    if "CE" in options_at_strike and "PE" in options_at_strike
-]
 
-# Find the valid strike closest to NIFTY price
-atm_strike = min(
-    valid_strikes,
-    key=lambda strike: abs(strike - nifty_price)
-)
+def main() -> None:
+    if not UPSTOX_ACCESS_TOKEN:
+        raise ValueError("UPSTOX_ACCESS_TOKEN is missing. Check your .env file.")
 
-atm_ce = strike_map[atm_strike]["CE"]
-atm_pe = strike_map[atm_strike]["PE"]
+    client = UpstoxClient(UPSTOX_ACCESS_TOKEN)
 
-print("NIFTY Price:", nifty_price)
-print("ATM Strike:", atm_strike)
+    response = client.get(
+        "/option/contract",
+        params={"instrument_key": NIFTY_50_INSTRUMENT_KEY},
+    )
+    contracts = response.get("data") or []
+    print("Total contracts:", len(contracts))
 
-print("ATM CE:", atm_ce["trading_symbol"])
-print("ATM CE Key:", atm_ce["instrument_key"])
+    price_response = client.get(
+        "/market-quote/ohlc",
+        params={
+            "instrument_key": NIFTY_50_INSTRUMENT_KEY,
+            "interval": "I1",
+        },
+    )
+    nifty_data = price_response.get("data") or {}
+    quote = nifty_data.get("NSE_INDEX:Nifty 50")
+    if not quote or quote.get("last_price") is None:
+        raise ValueError("NIFTY quote is missing from the Upstox response.")
 
-print("ATM PE:", atm_pe["trading_symbol"])
-print("ATM PE Key:", atm_pe["instrument_key"])
+    nifty_price = float(quote["last_price"])
+    atm_ce, atm_pe = select_atm_call_put(contracts, nifty_price)
+
+    print("Upstox options client connected")
+    print("NIFTY Price:", nifty_price)
+    print("Expiry:", atm_ce["expiry"])
+    print("ATM Strike:", atm_ce["strike_price"])
+    print("ATM CE:", atm_ce.get("trading_symbol"))
+    print("ATM CE Key:", atm_ce.get("instrument_key"))
+    print("ATM PE:", atm_pe.get("trading_symbol"))
+    print("ATM PE Key:", atm_pe.get("instrument_key"))
+
+
+if __name__ == "__main__":
+    main()

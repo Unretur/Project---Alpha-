@@ -650,3 +650,15 @@ Raw-data storage
 * Exact risk-management rules
 * Data retention/storage implementation
 * Final prediction model architecture
+
+---
+
+# 23. Current Implementation Caveats
+
+The current code includes basic availability checks, but some sources do not provide exact historical publication timestamps:
+
+- **News:** `ingested_at` records when our pipeline retrieved the article. It is not a verified historical timestamp for when the provider first exposed it. The current Upstox news prototype also queries Reliance Industries only.
+- **FRED:** the observation date is delayed to the next UTC midnight as a conservative guard against same-day leakage. It is not an exact release timestamp or a vintage history.
+- **RBI:** parsed observation/effective dates are similarly delayed by one UTC day when available. This does not reconstruct the original announcement timestamp.
+
+These guards reduce obvious timestamp errors but do not establish full point-in-time validity. Do not describe a news- or macro-dependent historical backtest as leakage-free until its source data supports the actual information-availability timeline.

@@ -7,7 +7,7 @@ BASE_URL = "https://api.stlouisfed.org/fred"
 
 
 class FREDClient:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str | None):
         self.session = requests.Session()
         self.api_key = api_key
 
@@ -17,6 +17,11 @@ class FREDClient:
             "api_key": self.api_key,
             "file_type": "json",
         }
+
+        if not self.api_key:
+            raise ValueError(
+                "FRED_API_KEY is missing. Set it in your .env file."
+            )
 
         response = self.session.get(
             f"{BASE_URL}{endpoint}",

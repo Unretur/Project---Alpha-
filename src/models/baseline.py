@@ -1,4 +1,4 @@
-"""Leakage-conscious Ridge baselines for NIFTY forward returns.
+""""Leakage-conscious Ridge baselines for NIFTY forward returns.
 
 Run from the repository root:
     python -m src.models.baseline
@@ -66,9 +66,16 @@ def build_feature_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     features["log_volume_change_lag_1"] = np.log1p(
         data["volume"]
     ).diff().shift(1)
-    features["open_interest_change_lag_1"] = data[
-        "open_interest"
-    ].pct_change(fill_method=None).shift(1)
+
+    # Constant/unusable open-interest sources must not create an all-NaN
+    # feature that silently removes every training row. Omit the feature
+    # when the raw series has no variation; preserve missingness otherwise.
+    open_interest = data["open_interest"]
+    if open_interest.nunique(dropna=True) > 1:
+        oi_change = open_interest.pct_change(fill_method=None).shift(1)
+        features["open_interest_change_lag_1"] = oi_change.replace(
+            [np.inf, -np.inf], np.nan
+        )
 
     for column in MACRO_COLUMNS:
         if column in data.columns:

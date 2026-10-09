@@ -62,6 +62,20 @@ def build_news_features(
         ]
     )
 
+    # An empty but correctly shaped result is valid when no
+    # usable articles were returned in this ingestion run.
+    if result.empty:
+        return pd.DataFrame(
+            columns=[
+                "available_time",
+                "news_positive_mean",
+                "news_negative_mean",
+                "news_neutral_mean",
+                "news_sentiment_net",
+                "news_article_count",
+            ]
+        )
+
     # A conservative availability proxy: the article must
     # have been published and retrieved by our ingestion run.
     # This is NOT proof of the provider's original availability.

@@ -449,3 +449,37 @@ Only after this succeeds should the next API/data component be implemented.
 ## Disclaimer
 
 Project Alpha is an experimental research and engineering project. Historical backtest results and paper-trading results do not guarantee future performance. No real-money trading is performed during the initial validation phase.
+
+## Local data-ingestion workflow
+
+Run commands from the repository root in the same Python environment used for the project.
+
+1. Configure local credentials in `.env` (copy `.env.example` and use the variable names documented by `src/config/config.py`). Never commit `.env`.
+2. Download FRED observations:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.ingestion.fred.download_macro
+   ```
+3. Download NIFTY 50 5-minute candles:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.ingestion.upstox.historical
+   ```
+4. Build the market + macro dataset:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.data_engineering.build_aligned_dataset
+   ```
+5. Fetch news and run FinBERT:
+   ```powershell
+   .\.venv\Scripts\python.exe -m src.ingestion.upstox.news
+   .\.venv\Scripts\python.exe -m src.ingestion.upstox.run_finbert
+   .\.venv\Scripts\python.exe -m src.data_engineering.news_features
+   .\.venv\Scripts\python.exe -m src.data_engineering.align_news_with_market
+   ```
+
+### Important data-timing limitation
+
+The news ingestion timestamp is when this pipeline retrieved an article, not a historical archive of when the provider first made the article available. Therefore, this news dataset is not sufficient on its own to claim a point-in-time-valid historical backtest. The alignment code prevents a feature timestamp from being later than the candle timestamp, but that check does not recover original historical availability. Use timestamped historical news data before making backtest claims that depend on news.
+
+The RBI parser expects source PDFs under `data/raw/rbi/`. If those files are unavailable, the market + FRED dataset can be built without RBI data; RBI-specific columns are then absent rather than populated with invented values.
+
+Historical candle download dates can be overridden with `ALPHA_MARKET_FROM_DATE` and `ALPHA_MARKET_TO_DATE` environment variables. The default window remains 2026-01-01 through 2026-10-08.
+

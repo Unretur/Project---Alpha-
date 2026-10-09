@@ -23,7 +23,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install lightweight test dependencies
-        run: python -m pip install --upgrade pip pandas numpy python-dotenv requests
+        run: python -m pip install --upgrade pip pandas numpy python-dotenv requests scikit-learn
 
       - name: Compile Python modules
         run: python -m compileall -q src
@@ -33,3 +33,4 @@ jobs:
           python -m unittest src.data_engineering.test_news_features
           python -m unittest src.data_engineering.test_options_selection
           python -m unittest src.data_engineering.test_create_targets
+          python -m unittest src.models.test_baseline

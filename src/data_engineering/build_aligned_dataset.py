@@ -59,6 +59,12 @@ def load_fred_series(
         "date",
     )
 
+    # FRED's observation date is not its intraday publication timestamp.
+    # Use the next UTC midnight as a conservative availability proxy to
+    # prevent using a same-day observation in an earlier market session.
+    # This is a guard against obvious same-day leakage, not exact vintage data.
+    df["date"] = df["date"] + pd.Timedelta(days=1)
+
     df = sort_by_datetime(
         df,
         "date",

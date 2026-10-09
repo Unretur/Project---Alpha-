@@ -39,29 +39,31 @@ def select_atm_call_put(
         raise ValueError("NIFTY price must be greater than zero.")
 
     decision_date = as_of_date or date.today()
-    eligible: list[tuple[date, dict]] = []
-    saw_expiry = False
-    saw_weekly_flag = False
-
+    dated_contracts: list[tuple[date, dict]] = []
     for contract in contracts:
         expiry = _parse_expiry(contract.get("expiry"))
-        if expiry is None:
-            continue
-        saw_expiry = True
-        if expiry < decision_date:
-            continue
-        if "weekly" in contract:
-            saw_weekly_flag = True
-            if not _is_weekly(contract.get("weekly")):
-                continue
-        eligible.append((expiry, contract))
+        if expiry is not None and expiry >= decision_date:
+            dated_contracts.append((expiry, contract))
 
-    if not saw_expiry:
-        raise ValueError("Option contract response does not contain valid expiry dates.")
-    if saw_weekly_flag and not eligible:
-        raise ValueError("No unexpired weekly option contracts are available.")
+    if not dated_contracts:
+        raise ValueError("No option contracts with unexpired, valid expiry dates are available.")
+
+    # Weekly CE/PE is the stated execution instrument. If the provider's
+    # response exposes a weekly flag, require it to be true; don't silently
+    # select a monthly or unclassified contract instead.
+    has_weekly_metadata = any("weekly" in contract for _, contract in dated_contracts)
+    if not has_weekly_metadata:
+        raise ValueError(
+            "Option contract response lacks a weekly flag; refusing to assume a contract is weekly."
+        )
+
+    eligible = [
+        (expiry, contract)
+        for expiry, contract in dated_contracts
+        if "weekly" in contract and _is_weekly(contract.get("weekly"))
+    ]
     if not eligible:
-        raise ValueError("No unexpired option contracts are available.")
+        raise ValueError("No unexpired weekly option contracts are available.")
 
     # Never mix strikes from different expiries in one CE/PE pair.
     nearest_expiry = min(expiry for expiry, _ in eligible)

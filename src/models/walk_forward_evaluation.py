@@ -45,6 +45,7 @@ def evaluate_walk_forward(
     dataset: pd.DataFrame,
     n_splits: int = DEFAULT_N_SPLITS,
     min_train_fraction: float = DEFAULT_MIN_TRAIN_FRACTION,
+    selected_features: list[str] | None = None,
 ) -> dict[str, Any]:
     """Evaluate each horizon across sequential test windows with expanding history."""
     if n_splits < 2:
@@ -52,7 +53,21 @@ def evaluate_walk_forward(
     if not 0 < min_train_fraction < 1:
         raise ValueError("min_train_fraction must be between 0 and 1.")
 
-    feature_frame, feature_columns = build_feature_frame(dataset)
+    feature_frame, available_features = build_feature_frame(dataset)
+    if selected_features is None:
+        feature_columns = available_features
+    else:
+        if not selected_features:
+            raise ValueError("selected_features must not be empty.")
+        missing_features = set(selected_features).difference(available_features)
+        if missing_features:
+            raise ValueError(
+                f"Unknown selected features: {sorted(missing_features)}"
+            )
+        if len(set(selected_features)) != len(selected_features):
+            raise ValueError("selected_features must not contain duplicates.")
+        feature_columns = list(selected_features)
+
     feature_frame[feature_columns] = feature_frame[feature_columns].replace(
         [np.inf, -np.inf], np.nan
     )

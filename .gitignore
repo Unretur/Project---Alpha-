@@ -223,3 +223,6 @@ __marimo__/
 __pycache__/
 *.pyc
 data/
+
+# Trained model artifacts are generated locally and should not be committed.
+models/artifacts/

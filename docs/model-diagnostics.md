@@ -1,33 +1,57 @@
-# Baseline and data diagnostics
+# Model training, evaluation, and inference
 
-Run these commands from the repository root using the project's virtual environment. The scripts read `data/processed/nifty_training_dataset.csv`; the diagnostic scripts do not overwrite the dataset.
+Run commands from the repository root in the project's Python 3.11 virtual environment.
 
-## Commands (PowerShell)
+## Build the training dataset
 
-```powershell
-.\.venv\Scripts\python.exe -m src.models.raw_data_audit
-.\.venv\Scripts\python.exe -m src.models.target_diagnostics
-.\.venv\Scripts\python.exe -m src.models.feature_diagnostics
-.\.venv\Scripts\python.exe -m src.models.evaluation_diagnostics
-.\.venv\Scripts\python.exe -m unittest src.models.test_baseline src.models.test_evaluation_diagnostics
-```
-
-Run the target-building pipeline first if the processed dataset does not exist:
-
-```powershell
+~~~powershell
+.\.venv\Scripts\python.exe -m src.data_engineering.build_aligned_dataset
 .\.venv\Scripts\python.exe -m src.data_engineering.create_targets
-```
+~~~
 
-## What to inspect
+The aligned dataset requires the configured raw NIFTY and FRED files; RBI files are optional. Do not invent or fill missing market observations to force training to run.
 
-- **Raw-data audit:** missingness, variability, and numeric ranges for market and available macro columns.
-- **Target diagnostics:** return distribution and missing-target counts for the 5-, 15-, and 30-minute horizons.
-- **Feature diagnostics:** feature missingness/variability, Pearson association with targets, and chronological train/test distribution shifts.
-- **Evaluation diagnostics:** Ridge regression errors compared with a zero-return predictor, plus directional coverage. A high sign-accuracy figure is not by itself evidence of tradable edge.
+## Train, compare, and evaluate
 
-## Research safeguards
+~~~powershell
+.\.venv\Scripts\python.exe -m src.models.train_model
+~~~
 
-- Predictors are lagged and the baseline uses chronological splits with a 30-minute purge.
-- Constant-volume-derived features are omitted because they contain no variation.
-- Correlation and baseline metrics are exploratory diagnostics, not a claim of profitability.
-- Historical news point-in-time availability is not currently established, so these diagnostics do not validate a news-driven historical backtest.
+For each 5-, 15-, and 30-minute return target, this compares a scaled Ridge model with a constrained histogram gradient-boosting regressor. Candidate selection uses validation MAE only. The selected candidate is refit on train+validation and evaluated once on the chronological test segment. A zero-return predictor is reported on both validation and test.
+
+Outputs:
+- models/artifacts/nifty_return_5m.joblib
+- models/artifacts/nifty_return_15m.joblib
+- models/artifacts/nifty_return_30m.joblib
+- data/processed/model_training_metrics.json
+
+Model artifacts and processed data are local outputs and are excluded from Git.
+
+## Generate latest predictions
+
+~~~powershell
+.\.venv\Scripts\python.exe -m src.models.predict_latest
+~~~
+
+The command checks the model's stored feature list and deployment gate. It refuses to emit default predictions if a model failed to beat the zero-return MAE benchmark on both validation and test. To inspect experimental output only:
+
+~~~powershell
+.\.venv\Scripts\python.exe -m src.models.predict_latest --allow-research-model
+~~~
+
+The research override is not approval for live or automated trading. The printed timestamp is the timestamp of the latest row with complete features; verify it is recent enough for the intended use.
+
+## Tests
+
+~~~powershell
+.\.venv\Scripts\python.exe -m unittest src.models.test_baseline src.models.test_evaluation_diagnostics src.models.test_train_predict_pipeline
+~~~
+
+## Interpretation and limits
+
+- MAE/RMSE measure return-prediction error; sign accuracy alone is not evidence of trading edge.
+- Passing the zero-return error benchmark is only a minimum model-quality gate, not a profitability guarantee. Backtesting still needs realistic fees, slippage, fill assumptions, and risk controls.
+- Predictors are lagged and chronological splits purge the maximum 30-minute target horizon.
+- Macro availability times are conservative proxies rather than exact historical release vintages.
+- Historical point-in-time news features are not included until their historical availability can be established.
+- Keep execution in paper-trading mode until the data, inference, and backtest path has been independently verified.

@@ -60,6 +60,17 @@ class BaselineModelTests(unittest.TestCase):
         for metrics in result["horizons"].values():
             self.assertGreater(metrics["test_rows"], 0)
 
+    def test_constant_volume_is_excluded(self):
+        source = sample_dataset()
+        source["volume"] = 0
+        feature_frame, features = build_feature_frame(source)
+        self.assertNotIn("log_volume_change_lag_1", features)
+        self.assertFalse(feature_frame[features].isna().all(axis=0).any())
+        result = run_baselines(source)
+        self.assertEqual(set(result["horizons"]), {"5m", "15m", "30m"})
+        for metrics in result["horizons"].values():
+            self.assertGreater(metrics["test_rows"], 0)
+
     def test_chronological_splits_are_ordered_and_purged(self):
         data, _ = build_feature_frame(sample_dataset())
         splits = chronological_split(data)

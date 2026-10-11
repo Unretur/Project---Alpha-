@@ -63,9 +63,13 @@ def build_feature_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     features["candle_body_lag_1"] = (
         (data["close"] - data["open"]) / data["open"]
     ).shift(1)
-    features["log_volume_change_lag_1"] = np.log1p(
-        data["volume"]
-    ).diff().shift(1)
+    # Some index-candle feeds report constant zero volume. A constant series
+    # cannot distinguish observations, so omit its derived feature.
+    volume = data["volume"]
+    if volume.nunique(dropna=True) > 1:
+        features["log_volume_change_lag_1"] = np.log1p(
+            volume
+        ).diff().shift(1)
 
     # Constant/unusable open-interest sources must not create an all-NaN
     # feature that silently removes every training row. Omit the feature

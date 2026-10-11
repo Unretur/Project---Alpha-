@@ -39,3 +39,4 @@ jobs:
           python -m unittest src.models.test_baseline
           python -m unittest src.models.test_evaluation_diagnostics
           python -m unittest src.models.test_train_predict_pipeline
+          python -m unittest src.models.test_walk_forward_evaluation

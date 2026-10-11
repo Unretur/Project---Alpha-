@@ -1,6 +1,5 @@
 import unittest
 
-import numpy as np
 import pandas as pd
 
 from src.models.test_baseline import sample_dataset
@@ -16,7 +15,8 @@ class WalkForwardEvaluationTests(unittest.TestCase):
         self.assertFalse(report["selection_used_test_folds"])
         self.assertEqual(set(report["horizons"]), {"5m", "15m", "30m"})
 
-        for result in report["horizons"].values():
+        for horizon, result in report["horizons"].items():
+            horizon_minutes = int(horizon.removesuffix("m"))
             self.assertEqual(len(result["folds"]), 3)
             self.assertGreater(result["aggregate_model_metrics"]["rows"], 0)
             self.assertGreater(result["aggregate_zero_return_baseline"]["mae"], 0)
@@ -25,7 +25,7 @@ class WalkForwardEvaluationTests(unittest.TestCase):
                 self.assertGreater(fold["test_rows"], 0)
                 self.assertLess(
                     pd.Timestamp(fold["train_end"])
-                    + pd.Timedelta(minutes=30),
+                    + pd.Timedelta(minutes=horizon_minutes),
                     pd.Timestamp(fold["test_start"]),
                 )
 

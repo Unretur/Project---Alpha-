@@ -28,18 +28,35 @@ DEFAULT_N_SPLITS = 4
 DEFAULT_MIN_TRAIN_FRACTION = 0.50
 
 
-def _metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, float | int]:
+def _metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, float | int | None]:
     if len(actual) == 0 or len(actual) != len(predicted):
         raise ValueError("Metric inputs must be non-empty and have equal lengths.")
+
+    nonzero_predictions = predicted != 0
     return {
         "rows": int(len(actual)),
         "mae": float(mean_absolute_error(actual, predicted)),
         "rmse": float(np.sqrt(mean_squared_error(actual, predicted))),
-        "directional_accuracy": float(
-            np.mean(np.sign(actual) == np.sign(predicted))
+        # Sign accuracy includes zero-valued actual/predicted returns. For a
+        # zero-return baseline, this mostly measures how often actual == 0,
+        # so it must not be interpreted as directional skill.
+        "sign_accuracy": float(np.mean(np.sign(actual) == np.sign(predicted))),
+        # Coverage tells us how often the model makes a non-zero directional call.
+        "directional_coverage": float(np.mean(nonzero_predictions)),
+        # Only score directional calls when the prediction is non-zero.
+        # The zero-return baseline therefore has no directional accuracy.
+        "directional_accuracy_when_nonzero": (
+            float(
+                np.mean(
+                    np.sign(actual[nonzero_predictions])
+                    == np.sign(predicted[nonzero_predictions])
+                )
+            )
+            if nonzero_predictions.any()
+            else None
         ),
     }
-
+}
 
 def evaluate_walk_forward(
     dataset: pd.DataFrame,

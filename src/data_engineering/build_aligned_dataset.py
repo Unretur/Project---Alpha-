@@ -157,6 +157,28 @@ def load_rbi_file(
     return df
 
 
+def resolve_usd_inr_columns(aligned: pd.DataFrame) -> pd.DataFrame:
+    """Standardize USD/INR values and their availability timestamp names."""
+    result = aligned.copy()
+    renames: dict[str, str] = {}
+
+    # FRED is loaded first; if RBI is present, overlapping values receive
+    # pandas suffixes. Keep both providers' timestamps distinguishable too.
+    if "usd_inr_x" in result.columns:
+        renames["usd_inr_x"] = "usd_inr_fred"
+    elif "usd_inr" in result.columns:
+        renames["usd_inr"] = "usd_inr_fred"
+
+    if "usd_inr_y" in result.columns:
+        renames["usd_inr_y"] = "usd_inr_rbi"
+    if "usd_inr_available_time" in result.columns:
+        renames["usd_inr_available_time"] = "usd_inr_fred_available_time"
+    if "rbi_fx_available_time" in result.columns:
+        renames["rbi_fx_available_time"] = "usd_inr_rbi_available_time"
+
+    return result.rename(columns=renames)
+
+
 # ============================================================
 # MAIN PIPELINE
 # ============================================================
@@ -326,22 +348,8 @@ if __name__ == "__main__":
     # 5. Resolve duplicate USD/INR columns
     # --------------------------------------------------------
 
-    # When RBI exchange rates are enabled, both providers may
-    # supply USD/INR. Rename the result without assuming RBI data
-    # is present in every development environment.
-    if "usd_inr_x" in aligned.columns:
-        aligned = aligned.rename(
-            columns={"usd_inr_x": "usd_inr_fred"}
-        )
-    elif "usd_inr" in aligned.columns:
-        aligned = aligned.rename(
-            columns={"usd_inr": "usd_inr_fred"}
-        )
-
-    if "usd_inr_y" in aligned.columns:
-        aligned = aligned.rename(
-            columns={"usd_inr_y": "usd_inr_rbi"}
-        )
+    # Resolve provider-specific USD/INR values and availability metadata.
+    aligned = resolve_usd_inr_columns(aligned)
 
     # --------------------------------------------------------
     # 6. Save unified dataset

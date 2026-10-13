@@ -3,7 +3,7 @@ import unittest
 import pandas as pd
 
 from src.models.test_baseline import sample_dataset
-from src.models.walk_forward_evaluation import evaluate_walk_forward
+from src.models.walk_forward_evaluation import _metrics, evaluate_walk_forward
 
 
 class WalkForwardEvaluationTests(unittest.TestCase):
@@ -28,6 +28,27 @@ class WalkForwardEvaluationTests(unittest.TestCase):
                     + pd.Timedelta(minutes=horizon_minutes),
                     pd.Timestamp(fold["test_start"]),
                 )
+
+    def test_zero_return_baseline_has_no_directional_coverage(self):
+        import numpy as np
+
+        actual = np.array([0.1, -0.1, 0.0])
+        zero_predictions = np.zeros_like(actual)
+        metrics = _metrics(actual, zero_predictions)
+
+        self.assertAlmostEqual(metrics["sign_accuracy"], 1 / 3)
+        self.assertEqual(metrics["directional_coverage"], 0.0)
+        self.assertIsNone(metrics["directional_accuracy_when_nonzero"])
+
+    def test_directional_accuracy_is_scored_only_for_nonzero_predictions(self):
+        import numpy as np
+
+        actual = np.array([0.1, -0.1, 0.0])
+        predictions = np.array([0.2, -0.1, 0.0])
+        metrics = _metrics(actual, predictions)
+
+        self.assertAlmostEqual(metrics["directional_coverage"], 2 / 3)
+        self.assertEqual(metrics["directional_accuracy_when_nonzero"], 1.0)
 
     def test_rejects_invalid_split_count(self):
         with self.assertRaises(ValueError):

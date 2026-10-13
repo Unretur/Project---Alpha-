@@ -19,10 +19,10 @@ def run_backtest(
     round_trip_cost_bps: float = 10.0,
     periods_per_year: int = 252 * 75,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Evaluate one row per executed, non-overlapping trade opportunity.
+    """Evaluate OOS returns; if horizon_minutes is present, prevent overlapping trades.
 
-    Predictions must be out-of-sample. Actual returns must match the executable
-    entry/exit interval. This is not a broker execution simulator.
+    This is a research approximation, not a broker execution simulator. Without
+    horizon_minutes, callers must provide non-overlapping opportunities.
     """
     missing = set(REQUIRED_COLUMNS).difference(predictions.columns)
     if missing:
@@ -32,7 +32,11 @@ def run_backtest(
     if predictions.empty:
         raise ValueError("At least one prediction row is required.")
 
-    trades = predictions.loc[:, REQUIRED_COLUMNS].copy()
+    keep = list(REQUIRED_COLUMNS)
+    has_horizon = "horizon_minutes" in predictions.columns
+    if has_horizon:
+        keep.append("horizon_minutes")
+    trades = predictions.loc[:, keep].copy()
     trades["timestamp"] = pd.to_datetime(trades["timestamp"], utc=True, errors="raise")
     if trades["timestamp"].isna().any() or trades["timestamp"].duplicated().any():
         raise ValueError("Trade timestamps must be non-null and unique.")
@@ -44,7 +48,25 @@ def run_backtest(
 
     pred = trades["predicted_return"].to_numpy(dtype=float)
     actual = trades["actual_forward_return"].to_numpy(dtype=float)
-    trades["signal"] = np.where(pred > threshold, 1, np.where(pred < -threshold, -1, 0))
+    proposed = np.where(pred > threshold, 1, np.where(pred < -threshold, -1, 0))
+    trades["proposed_signal"] = proposed
+    if has_horizon:
+        horizons = pd.to_numeric(trades["horizon_minutes"], errors="raise").to_numpy(dtype=float)
+        if not np.isfinite(horizons).all() or (horizons <= 0).any():
+            raise ValueError("horizon_minutes must contain finite positive values.")
+        signals = np.zeros(len(trades), dtype=int)
+        exits = []
+        next_entry = pd.Timestamp.min.tz_localize("UTC")
+        for i, timestamp in enumerate(trades["timestamp"]):
+            if timestamp >= next_entry and proposed[i] != 0:
+                signals[i] = int(proposed[i])
+                next_entry = timestamp + pd.Timedelta(minutes=float(horizons[i]))
+            exits.append(timestamp + pd.Timedelta(minutes=float(horizons[i])))
+        trades["exit_timestamp"] = exits
+        trades["signal"] = signals
+    else:
+        trades["signal"] = proposed
+
     trades["gross_return"] = trades["signal"] * actual
     trades["cost_return"] = np.where(
         trades["signal"] != 0, round_trip_cost_bps / 10000.0, 0.0
@@ -61,6 +83,7 @@ def run_backtest(
     metrics: dict[str, Any] = {
         "trade_opportunities": int(len(trades)),
         "trades_taken": int((trades["signal"] != 0).sum()),
+        "signals_skipped_while_position_open": int(((trades["proposed_signal"] != 0) & (trades["signal"] == 0)).sum()),
         "long_trades": int((trades["signal"] == 1).sum()),
         "short_trades": int((trades["signal"] == -1).sum()),
         "flat_opportunities": int((trades["signal"] == 0).sum()),
@@ -72,9 +95,10 @@ def run_backtest(
         "average_net_return_per_trade": float(active.mean()) if len(active) else None,
         "sharpe_ratio": sharpe,
         "limitations": [
-            "Input must be out-of-sample predictions and one row per non-overlapping trade.",
+            "Input must contain out-of-sample predictions.",
+            "When horizon_minutes is present, new trades are blocked until the prior horizon ends.",
             "Fixed costs approximate fees and slippage; actual costs may differ.",
-            "This evaluates the supplied underlying-return series, not options P&L.",
+            "This evaluates supplied underlying-return series, not options P&L.",
             "Sharpe annualization depends on trade frequency and holding period.",
             "Historical performance does not guarantee future results.",
         ],
@@ -85,16 +109,17 @@ def run_backtest(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True,
-                        help="CSV with timestamp,predicted_return,actual_forward_return.")
+                        help="CSV with timestamp,predicted_return,actual_forward_return; optional horizon_minutes.")
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/backtest"))
     parser.add_argument("--threshold", type=float, default=0.0)
     parser.add_argument("--cost-bps", type=float, default=10.0)
+    parser.add_argument("--periods-per-year", type=int, default=252 * 75)
     args = parser.parse_args()
     if not args.input.is_file():
         raise FileNotFoundError(f"Backtest input not found: {args.input}")
     trades, metrics = run_backtest(
         pd.read_csv(args.input), threshold=args.threshold,
-        round_trip_cost_bps=args.cost_bps,
+        round_trip_cost_bps=args.cost_bps, periods_per_year=args.periods_per_year,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     trades.to_csv(args.output_dir / "backtest_trades.csv", index=False)

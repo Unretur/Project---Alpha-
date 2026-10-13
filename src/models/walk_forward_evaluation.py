@@ -56,7 +56,6 @@ def _metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, float | int
             else None
         ),
     }
-}
 
 def evaluate_walk_forward(
     dataset: pd.DataFrame,

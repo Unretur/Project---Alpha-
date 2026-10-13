@@ -47,5 +47,19 @@ class BacktestTests(unittest.TestCase):
         self.assertIsNone(metrics["win_rate_net"])
 
 
+    def test_horizon_prevents_overlapping_trades(self):
+        data = pd.DataFrame({
+            "timestamp": pd.date_range("2026-01-01", periods=5, freq="5min", tz="UTC"),
+            "predicted_return": [0.01, 0.02, -0.02, 0.01, 0.01],
+            "actual_forward_return": [0.01, 0.02, -0.02, 0.01, 0.01],
+            "horizon_minutes": [15, 15, 15, 15, 15],
+        })
+        trades, metrics = run_backtest(data, round_trip_cost_bps=0)
+        self.assertEqual(trades["signal"].tolist(), [1, 0, 0, 1, 0])
+        self.assertEqual(metrics["trades_taken"], 2)
+        self.assertEqual(metrics["signals_skipped_while_position_open"], 3)
+
+
+
 if __name__ == "__main__":
     unittest.main()

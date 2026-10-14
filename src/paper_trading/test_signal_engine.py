@@ -28,6 +28,9 @@ class PaperSignalEngineTests(unittest.TestCase):
             )
             self.assertEqual([s["horizon_minutes"] for s in signals], [5, 15, 30])
             self.assertTrue(all(s["execution_allowed"] is False for s in signals))
+            self.assertTrue(all(s["deployment_eligible"] is False for s in signals))
+            self.assertTrue(all(s["data_fresh"] is False for s in signals))
+            self.assertTrue(all(s["research_trade_allowed"] is False for s in signals))
             self.assertTrue(all(s["paper_action"] == "HOLD" for s in signals))
             self.assertTrue(all("proposed_signal" in s for s in signals))
 

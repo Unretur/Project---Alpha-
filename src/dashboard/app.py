@@ -181,28 +181,20 @@ if st.sidebar.button("Generate research forecasts only", use_container_width=Tru
     if ok:
         st.rerun()
 
-can_run_approved = bool(signals) and all(
-    s.get("execution_allowed", False) is True
-    and s.get("data_fresh", False) is True
-    and s.get("deployment_eligible", False) is True
-    for s in signals
-)
-if st.sidebar.button("▶ Run deployment-approved simulation", disabled=not can_run_approved, use_container_width=True):
-    with st.spinner("Running deployment-approved paper simulation…"):
-        ok, output = run_module("src.paper_trading.paper_engine")
-    (st.sidebar.success if ok else st.sidebar.error)("Paper simulator completed." if ok else "Paper simulator failed.")
-    st.sidebar.code(output or "No output")
-    if ok:
-        st.rerun()
-
-can_run_research = bool(signals) and all(
-    s.get("trading_mode") == "RESEARCH_PAPER"
-    and s.get("research_trade_allowed") is True
-    and s.get("data_fresh") is True
-    for s in signals
+can_run_research = (
+    bool(signals)
+    and all(
+        s.get("trading_mode") == "RESEARCH_PAPER"
+        and s.get("data_fresh") is True
+        for s in signals
+    )
+    and any(s.get("research_trade_allowed") is True for s in signals)
 )
 if not can_run_research:
-    st.sidebar.warning("Research paper entries require fresh data and a directional proposal. Model deployment approval is not required for this isolated simulation.")
+    st.sidebar.warning(
+        "Research paper entries require fresh data and at least one directional proposal. "
+        "Model deployment approval is not required for this isolated simulation."
+    )
 if st.sidebar.button("🧪 Run research paper-trading cycle", disabled=not can_run_research, use_container_width=True):
     with st.spinner("Running experimental research paper simulation…"):
         ok, output = run_module("src.paper_trading.paper_engine")

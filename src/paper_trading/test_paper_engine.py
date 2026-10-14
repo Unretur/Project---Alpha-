@@ -40,6 +40,7 @@ class PaperTradingEngineTests(unittest.TestCase):
                 "signal_id": "NIFTY50-5m-research-test",
                 "trading_mode": "RESEARCH_PAPER",
                 "research_trade_allowed": True,
+                "proposed_signal": "LONG",
                 "execution_allowed": False,
                 "deployment_eligible": False,
                 "data_fresh": True,

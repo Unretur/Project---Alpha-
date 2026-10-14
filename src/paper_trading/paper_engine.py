@@ -19,7 +19,7 @@ SIGNALS = Path("data/processed/paper_trading/latest_signals.json")
 DATASET = Path("data/processed/nifty_training_dataset.csv")
 STATE = Path("data/processed/paper_trading")
 POSITIONS = ["signal_id", "instrument", "horizon_minutes", "direction", "entry_timestamp",
-             "entry_price", "notional", "quantity", "entry_cost", "model_name"]
+             "entry_price", "notional", "quantity", "entry_cost", "model_name", "trading_mode"]
 TRADES = POSITIONS + ["exit_timestamp", "exit_price", "gross_pnl", "total_cost",
                       "net_pnl", "return_on_notional", "holding_minutes"]
 
@@ -107,13 +107,22 @@ def run_paper_trading(
         signal_id = str(signal.get("signal_id", ""))
         if not signal_id or signal_id in known or signal_id in done:
             continue
-        if not bool(signal.get("execution_allowed", False)):
-            continue
-        # Defence in depth: explicit unsafe flags cannot be overridden by execution_allowed.
-        if signal.get("data_fresh") is False or signal.get("deployment_eligible") is False:
-            continue
-
-        direction = str(signal.get("paper_action", "")).upper()
+        research_mode = signal.get("trading_mode") == "RESEARCH_PAPER"
+        if research_mode:
+            # Experimental paper trades may use an ineligible model, but only
+            # with an explicit research flag and fresh data. No broker is involved.
+            if signal.get("research_trade_allowed") is not True:
+                continue
+            if signal.get("data_fresh") is not True:
+                continue
+            direction = str(signal.get("proposed_signal", "")).upper()
+        else:
+            if not bool(signal.get("execution_allowed", False)):
+                continue
+            # Defence in depth: unsafe flags cannot be overridden by execution_allowed.
+            if signal.get("data_fresh") is False or signal.get("deployment_eligible") is False:
+                continue
+            direction = str(signal.get("paper_action", "")).upper()
         try:
             horizon = int(signal["horizon_minutes"])
             stamp = pd.to_datetime(signal["timestamp"], utc=True, errors="raise").isoformat()
@@ -137,6 +146,7 @@ def run_paper_trading(
             "quantity": notional_per_trade / price,
             "entry_cost": notional_per_trade * cost_rate,
             "model_name": signal.get("model_name", "unknown"),
+            "trading_mode": "RESEARCH_PAPER" if research_mode else "DEPLOYMENT_APPROVED",
         }
         remaining.append(position)
         opened.append(position)
@@ -158,6 +168,7 @@ def run_paper_trading(
     summary = {
         "updated_at": now_ts.isoformat(),
         "mode": "PAPER_ONLY_NO_BROKER",
+        "research_mode_trades": sum(1 for p in remaining if p.get("trading_mode") == "RESEARCH_PAPER") + sum(1 for t in trades if t.get("trading_mode") == "RESEARCH_PAPER"),
         "latest_market_timestamp": latest_ts.isoformat(),
         "simulation_clock": now_ts.isoformat(),
         "initial_cash": initial_cash,

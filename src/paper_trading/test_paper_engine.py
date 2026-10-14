@@ -33,6 +33,45 @@ class PaperTradingEngineTests(unittest.TestCase):
             self.assertEqual(result["summary"]["open_positions"], 0)
             self.assertEqual(result["summary"]["opened_this_run"], 0)
 
+    def test_research_mode_allows_fresh_ineligible_paper_signal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            research_signal = {
+                **self.signal,
+                "signal_id": "NIFTY50-5m-research-test",
+                "trading_mode": "RESEARCH_PAPER",
+                "research_trade_allowed": True,
+                "proposed_signal": "LONG",
+                "execution_allowed": False,
+                "deployment_eligible": False,
+                "data_fresh": True,
+            }
+            result = run_paper_trading(
+                [research_signal], self.data.iloc[:1],
+                state_dir=Path(tmp),
+                now=datetime(2026, 10, 14, 9, 15, tzinfo=timezone.utc),
+            )
+            self.assertEqual(result["summary"]["opened_this_run"], 1)
+            self.assertEqual(result["summary"]["open_positions"], 1)
+
+    def test_research_mode_still_blocks_stale_signal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            research_signal = {
+                **self.signal,
+                "signal_id": "NIFTY50-5m-stale-research-test",
+                "trading_mode": "RESEARCH_PAPER",
+                "research_trade_allowed": True,
+                "execution_allowed": False,
+                "deployment_eligible": False,
+                "data_fresh": False,
+            }
+            result = run_paper_trading(
+                [research_signal], self.data.iloc[:1],
+                state_dir=Path(tmp),
+                now=datetime(2026, 10, 14, 9, 15, tzinfo=timezone.utc),
+            )
+            self.assertEqual(result["summary"]["opened_this_run"], 0)
+            self.assertEqual(result["summary"]["open_positions"], 0)
+
     def test_position_opens_then_closes_with_costs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -41,3 +41,8 @@ jobs:
           python -m unittest src.models.test_train_predict_pipeline
           python -m unittest src.models.test_walk_forward_evaluation
           python -m unittest src.models.test_feature_ablation
+
+      - name: Run paper-trading safety tests
+        run: |
+          python -m unittest src.paper_trading.test_paper_engine -v
+          python -m unittest src.paper_trading.test_signal_engine -v

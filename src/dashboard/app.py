@@ -71,13 +71,30 @@ def run_module(module: str) -> tuple[bool, str]:
             cwd=ROOT,
             capture_output=True,
             text=True,
-            timeout=90,
+            timeout=120,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, str(exc)
     output = (completed.stdout or "") + ("\n" + completed.stderr if completed.stderr else "")
     return completed.returncode == 0, output.strip() or f"Exit code: {completed.returncode}"
+
+
+def run_live_refresh_pipeline() -> tuple[bool, str]:
+    """Refresh Upstox candles, rebuild features/targets, then generate research signals."""
+    modules = (
+        "src.ingestion.upstox.intraday",
+        "src.data_engineering.build_aligned_dataset",
+        "src.data_engineering.create_targets",
+        "src.paper_trading.signal_engine",
+    )
+    outputs = []
+    for module in modules:
+        ok, output = run_module(module)
+        outputs.append(f"$ python -m {module}\n{output}")
+        if not ok:
+            return False, "\n\n".join(outputs)
+    return True, "\n\n".join(outputs)
 
 
 st.title("📈 Project Alpha")
@@ -146,7 +163,17 @@ st.sidebar.caption("Actions run local Python modules in this project. No broker 
 if st.sidebar.button("🔄 Refresh dashboard", use_container_width=True):
     st.rerun()
 
-if st.sidebar.button("Generate research forecasts", use_container_width=True):
+if st.sidebar.button("🌐 Refresh market data + forecasts", use_container_width=True):
+    with st.spinner("Refreshing Upstox candles and rebuilding the dataset…"):
+        ok, output = run_live_refresh_pipeline()
+    (st.sidebar.success if ok else st.sidebar.error)(
+        "Market refresh and forecast pipeline completed." if ok else "Market refresh pipeline failed."
+    )
+    st.sidebar.code(output or "No output")
+    if ok:
+        st.rerun()
+
+if st.sidebar.button("Generate research forecasts only", use_container_width=True):
     with st.spinner("Running the signal engine…"):
         ok, output = run_module("src.paper_trading.signal_engine")
     (st.sidebar.success if ok else st.sidebar.error)("Signal engine completed." if ok else "Signal engine failed.")
@@ -154,18 +181,32 @@ if st.sidebar.button("Generate research forecasts", use_container_width=True):
     if ok:
         st.rerun()
 
-can_run_paper = bool(signals) and all(
+can_run_approved = bool(signals) and all(
     s.get("execution_allowed", False) is True
     and s.get("data_fresh", False) is True
     and s.get("deployment_eligible", False) is True
     for s in signals
 )
-if not can_run_paper:
-    st.sidebar.warning("Paper entries are blocked until every signal is explicitly execution-allowed, fresh, and deployment-eligible.")
-if st.sidebar.button("▶ Run paper simulation cycle", disabled=not can_run_paper, use_container_width=True):
-    with st.spinner("Running the paper simulator…"):
+if st.sidebar.button("▶ Run deployment-approved simulation", disabled=not can_run_approved, use_container_width=True):
+    with st.spinner("Running deployment-approved paper simulation…"):
         ok, output = run_module("src.paper_trading.paper_engine")
     (st.sidebar.success if ok else st.sidebar.error)("Paper simulator completed." if ok else "Paper simulator failed.")
+    st.sidebar.code(output or "No output")
+    if ok:
+        st.rerun()
+
+can_run_research = bool(signals) and all(
+    s.get("trading_mode") == "RESEARCH_PAPER"
+    and s.get("research_trade_allowed") is True
+    and s.get("data_fresh") is True
+    for s in signals
+)
+if not can_run_research:
+    st.sidebar.warning("Research paper entries require fresh data and a directional proposal. Model deployment approval is not required for this isolated simulation.")
+if st.sidebar.button("🧪 Run research paper-trading cycle", disabled=not can_run_research, use_container_width=True):
+    with st.spinner("Running experimental research paper simulation…"):
+        ok, output = run_module("src.paper_trading.paper_engine")
+    (st.sidebar.success if ok else st.sidebar.error)("Research simulation completed." if ok else "Research simulation failed.")
     st.sidebar.code(output or "No output")
     if ok:
         st.rerun()

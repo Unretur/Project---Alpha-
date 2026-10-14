@@ -36,8 +36,11 @@ def generate_paper_signals(
     max_data_age_minutes: float = 15,
     now: datetime | None = None,
     allow_research_models: bool = True,
+    trading_mode: str = "RESEARCH_PAPER",
 ) -> list[dict[str, Any]]:
     """Create auditable signals; never submit orders or imply profitability."""
+    if trading_mode not in {"RESEARCH_PAPER", "DEPLOYMENT_APPROVED"}:
+        raise ValueError("trading_mode must be RESEARCH_PAPER or DEPLOYMENT_APPROVED.")
     if threshold < 0:
         raise ValueError("threshold must be non-negative.")
     if max_data_age_minutes <= 0:
@@ -64,9 +67,26 @@ def generate_paper_signals(
         predicted = float(item["predicted_forward_return"])
         proposed = _direction(predicted, threshold)
         eligible = bool(item["deployment_eligible"])
-        # Stale inputs or models that failed the benchmark gate must never
-        # authorize simulated execution. Keep the proposal for research review.
+        # Keep research simulation explicitly separate from deployment approval.
+        # Research trades require fresh data and a directional proposal, but do not
+        # change the model's deployment_eligible flag or execution_allowed gate.
+        research_trade_allowed = bool(fresh and proposed != "HOLD")
         executable = bool(fresh and eligible and proposed != "HOLD")
+        if trading_mode == "RESEARCH_PAPER":
+            paper_action = proposed if research_trade_allowed else "HOLD"
+            status = (
+                "RESEARCH_PAPER_READY" if research_trade_allowed
+                else "STALE_DATA" if not fresh
+                else "BELOW_SIGNAL_THRESHOLD"
+            )
+        else:
+            paper_action = proposed if executable else "HOLD"
+            status = (
+                "READY_FOR_PAPER_SIMULATION" if executable
+                else "RESEARCH_ONLY_MODEL_INELIGIBLE" if not eligible
+                else "STALE_DATA" if not fresh
+                else "BELOW_SIGNAL_THRESHOLD"
+            )
         signals.append({
             "signal_id": f"NIFTY50-{item['horizon_minutes']}m-{item['timestamp']}",
             "instrument": "NIFTY 50",
@@ -76,18 +96,15 @@ def generate_paper_signals(
             "predicted_forward_return": predicted,
             "threshold": float(threshold),
             "proposed_signal": proposed,
-            "paper_action": proposed if executable else "HOLD",
+            "paper_action": paper_action,
+            "trading_mode": trading_mode,
+            "research_trade_allowed": research_trade_allowed,
             "data_timestamp_age_minutes": round(age_minutes, 3),
             "data_fresh": bool(fresh),
             "model_name": item["model_name"],
             "deployment_eligible": eligible,
             "execution_allowed": executable,
-            "status": (
-                "READY_FOR_PAPER_SIMULATION" if executable
-                else "RESEARCH_ONLY_MODEL_INELIGIBLE" if not eligible
-                else "STALE_DATA" if not fresh
-                else "BELOW_SIGNAL_THRESHOLD"
-            ),
+            "status": status,
             "notice": "Research simulation only. No broker orders are sent; no profitability is implied.",
         })
     return signals
@@ -120,6 +137,12 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=0.0005,
                         help="Absolute predicted-return threshold (default: 5 bps; research setting).")
     parser.add_argument("--max-data-age-minutes", type=float, default=15)
+    parser.add_argument(
+        "--trading-mode",
+        choices=("RESEARCH_PAPER", "DEPLOYMENT_APPROVED"),
+        default="RESEARCH_PAPER",
+        help="Research paper mode allows experimental simulations only with fresh data; it never sends broker orders.",
+    )
     parser.add_argument("--allow-stale-data", action="store_true",
                         help="Generate research proposals from stale data; execution remains disabled.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -135,12 +158,14 @@ def main() -> None:
         threshold=args.threshold,
         max_data_age_minutes=args.max_data_age_minutes,
         allow_research_models=True,
+        trading_mode=args.trading_mode,
     )
     if args.allow_stale_data:
         # Explicitly research-only override: retain proposed directions, but
         # force execution_allowed false in every output row.
         for signal in signals:
             signal["execution_allowed"] = False
+            signal["research_trade_allowed"] = False
             signal["paper_action"] = "HOLD"
             signal["status"] = "RESEARCH_ONLY_STALE_OVERRIDE"
     write_signal_outputs(signals, output_path=args.output, ledger_path=args.ledger)

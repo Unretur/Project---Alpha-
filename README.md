@@ -1,5 +1,8 @@
 # Project Alpha
 
+> **Current status: research application / model validation in progress.** The latest local evaluation reported on 2026-10-15 did not qualify any of the 5m, 15m, or 30m return models for deployment: all three failed the zero-return MAE gate on the held-out test split, and walk-forward results did not show consistent baseline improvement. Forecasts are exploratory only; model-driven paper-trading entries must remain disabled. A running dashboard or cloud deployment is not evidence of predictive skill or profitability. See [Model Readiness and Research-Only Operation](docs/model-readiness-and-research-mode.md).
+
+
 ## NIFTY 50 Short-Horizon Prediction & Autonomous Paper-Trading System
 
 Project Alpha is a production-oriented machine learning system designed to investigate whether financial news, market data, derivatives data, macroeconomic variables, and global market information can provide predictive power for short-horizon NIFTY 50 returns.

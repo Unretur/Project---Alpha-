@@ -403,51 +403,24 @@ The historical backtest and paper-trading system should share the same core prep
 
 ### Current Phase
 
-**Phase 1 — API Implementation**
+**Research application / model validation.** Market-data ingestion and model evaluation code are present, but the latest reported model evaluation (2026-10-15) did not qualify any horizon for model-driven entries.
 
-Research and repository setup are complete. The project is now moving directly into implementation.
+The current 5m, 15m, and 30m Ridge models all failed to beat the zero-return MAE baseline on the held-out test set. Walk-forward evaluation did not establish consistent improvement. See [Model Readiness and Research-Only Operation](docs/model-readiness-and-research-mode.md) for the reported metrics and validation plan.
 
-The immediate implementation sequence is:
+The dashboard may be deployed as a research interface, provided forecasts are clearly labelled exploratory and automated model-driven paper-trading entries remain disabled. A successful Docker/AWS deployment is an infrastructure milestone, not evidence of predictive skill or profitability.
 
-```text
-Upstox App
-    ↓
-Authentication
-    ↓
-First NIFTY API response
-    ↓
-Instrument discovery
-    ↓
-Historical market data
-    ↓
-Futures + options / option chain
-    ↓
-Global market data
-    ↓
-Live WebSocket
-    ↓
-Raw-data storage
-```
+### Next Steps
 
-After the market-data layer is working, Alpha will proceed to macro/news ingestion, FinBERT, feature engineering, model training, backtesting, paper trading, AWS deployment, and the dashboard.
+1. Preserve the deployment gate and research-only status.
+2. Inspect fold-level walk-forward results and audit targets, feature timestamps, and train/validation/test boundaries.
+3. Improve and validate models using training/validation data only; reserve an untouched period for final evaluation.
+4. Build realistic strategy evaluation with option pricing/selection, transaction costs, spread, slippage, and risk controls.
+5. Dockerize and deploy the research application without enabling automated entries.
+6. Reconsider paper-trading eligibility only after a documented validation review.
 
 ### Development Rule
 
-The GitHub repository is the source of truth for the project.
-
-Implementation will proceed component-by-component. Each integration should be tested before the next layer is built. Secrets must remain outside GitHub and be stored through environment variables/secrets management.
-
-### Immediate Next Step
-
-**Create/configure the Upstox developer application and complete authentication.**
-
-The first technical milestone is:
-
-> **Project Alpha successfully retrieves real NIFTY market data through Upstox from Python.**
-
-Only after this succeeds should the next API/data component be implemented.
-
----
+The GitHub repository is the source of truth for tracked code. Keep credentials out of source control and use environment variables or a secrets manager. Local dashboard code not present in this repository must be committed separately before it can be reviewed or deployed from GitHub.
 
 ## Disclaimer
 

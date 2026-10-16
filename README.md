@@ -398,8 +398,9 @@ The historical backtest and paper-trading system should share the same core prep
 - [ ] Signal engine
 - [ ] Backtesting engine
 - [ ] Paper-trading engine
-- [ ] AWS deployment
-- [ ] Live dashboard
+- [x] Temporary Docker/AWS dashboard smoke test completed (2026-10-16); public-IP access verified, then EC2 instance terminated
+- [ ] Reproducible deployment configuration committed to GitHub
+- [ ] Permanent dashboard hosting / live dashboard
 
 ### Current Phase
 
@@ -407,7 +408,7 @@ The historical backtest and paper-trading system should share the same core prep
 
 The current 5m, 15m, and 30m Ridge models all failed to beat the zero-return MAE baseline on the held-out test set. Walk-forward evaluation did not establish consistent improvement. See [Model Readiness and Research-Only Operation](docs/model-readiness-and-research-mode.md) for the reported metrics and validation plan.
 
-The dashboard may be deployed as a research interface, provided forecasts are clearly labelled exploratory and automated model-driven paper-trading entries remain disabled. A successful Docker/AWS deployment is an infrastructure milestone, not evidence of predictive skill or profitability.
+The dashboard may be deployed as a research interface, provided forecasts are clearly labelled exploratory and automated model-driven paper-trading entries remain disabled. On 2026-10-16, a temporary Docker image was pushed to Docker Hub, pulled onto an AWS EC2 test instance, and the dashboard was verified through a public URL. The EC2 instance was then terminated; the test URL is no longer a persistent deployment. The dashboard Dockerfile and its build requirements used for that test are not yet committed in this repository, so the deployment is not currently reproducible from GitHub alone. A successful Docker/AWS smoke test is an infrastructure milestone, not evidence of predictive skill or profitability.
 
 ### Next Steps
 
@@ -415,8 +416,9 @@ The dashboard may be deployed as a research interface, provided forecasts are cl
 2. Inspect fold-level walk-forward results and audit targets, feature timestamps, and train/validation/test boundaries.
 3. Improve and validate models using training/validation data only; reserve an untouched period for final evaluation.
 4. Build realistic strategy evaluation with option pricing/selection, transaction costs, spread, slippage, and risk controls.
-5. Dockerize and deploy the research application without enabling automated entries.
-6. Reconsider paper-trading eligibility only after a documented validation review.
+5. Add and review the dashboard's Dockerfile, dashboard-specific requirements, and deployment instructions in GitHub so the tested image can be rebuilt reproducibly; keep credentials and `.env` files out of source control.
+6. Choose a low-cost permanent hosting option for the research interface without enabling automated entries.
+7. Reconsider paper-trading eligibility only after a documented validation review.
 
 ### Development Rule
 
